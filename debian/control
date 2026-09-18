@@ -1,0 +1,30 @@
+Source: sideboard
+Section: utils
+Priority: optional
+Maintainer: Greg Gauthier <gmgauthier@protonmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ meson (>= 0.56),
+ ninja-build,
+ pkg-config,
+ g++,
+ libgtkmm-3.0-dev,
+ libcurl4-openssl-dev,
+ libssl-dev
+Standards-Version: 4.7.0
+Homepage: https://github.com/gmgauthier/sideboard
+Vcs-Git: https://github.com/gmgauthier/sideboard.git
+Vcs-Browser: https://github.com/gmgauthier/sideboard
+Rules-Requires-Root: no
+
+Package: sideboard
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ pkexec,
+ apt
+Description: Guest-suite cabinet for The Lunduke Computer Operating System
+ Sideboard lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris,
+ Partyline, Dispatch, and itself; compares dpkg versions to GitHub Releases;
+ and installs the published .deb. It is not an official LCOS updater.

@@ -13,6 +13,7 @@
 #include <glibmm.h>
 
 #include <algorithm>
+#include <cstring>
 #include <sys/wait.h>
 
 namespace sideboard {
@@ -138,10 +139,19 @@ class AppRow : public Gtk::ListBoxRow {
     installed_.set_text(inst.present ? Glib::ustring(inst.upstream) : Glib::ustring("—"));
     set_status_class(status_, nullptr);
     action_.set_sensitive(false);
-    remove_.set_sensitive(inst.present);
+    const bool self = package_ && std::strcmp(package_, "sideboard") == 0;
+    remove_.set_sensitive(inst.present && !self);
 
+    if (remote_.no_release) {
+      available_.set_text("—");
+      action_.set_sensitive(false);
+      action_.set_label("—");
+      status_.set_text("No release");
+      return;
+    }
     if (!remote_.ok && remote_.error.empty() && remote_.url.empty()) {
       available_.set_text("—");
+      action_.set_sensitive(false);
       if (inst.present) {
         status_.set_text("—");
         action_.set_label("—");
@@ -153,10 +163,15 @@ class AppRow : public Gtk::ListBoxRow {
     }
     if (!remote_.ok) {
       available_.set_text(remote_.upstream.empty() ? "—" : remote_.upstream);
+      action_.set_sensitive(!remote_.url.empty());
+      if (remote_.url.empty()) {
+        action_.set_label("—");
+        status_.set_text("Not available");
+        return;
+      }
       status_.set_text("Error");
       set_status_class(status_, "sideboard-status-error");
       action_.set_label(inst.present ? "Upgrade" : "Install");
-      action_.set_sensitive(!remote_.url.empty());
       return;
     }
     available_.set_text(remote_.upstream);
@@ -472,7 +487,14 @@ void Window::run_refresh()
     }
     progress_dispatch_.emit();
     results[i] = fetch_latest(apps[i].owner, apps[i].repo, apps[i].package);
-    if (!results[i].ok) {
+    if (results[i].rate_limited) {
+      for (std::size_t j = i + 1; j < n; ++j) {
+        results[j].rate_limited = true;
+        results[j].error = results[i].error;
+      }
+      break;
+    }
+    if (!results[i].ok && !results[i].no_release) {
       ++failed;
       if (banner.empty())
         banner = results[i].error;
@@ -533,7 +555,7 @@ void Window::on_refresh_done()
       rem.cached = false;
       cache.apps[apps[i].package] = rem;
       ++live_ok;
-    } else {
+    } else if (!rem.no_release) {
       auto it = cache.apps.find(apps[i].package);
       if (it != cache.apps.end()) {
         rem = it->second;
@@ -541,7 +563,7 @@ void Window::on_refresh_done()
         rem.ok = true;
       }
     }
-    const bool show = rem.ok || !rem.error.empty();
+    const bool show = rem.ok || rem.no_release || !rem.error.empty();
     rows_[i]->apply(query_installed(apps[i].package), show ? &rem : nullptr);
   }
   if (live_ok > 0) {
@@ -550,6 +572,17 @@ void Window::on_refresh_done()
     last_checked_.set_text("Last checked: " + cache.checked);
     if (avail_head_)
       avail_head_->set_text("Available");
+  }
+  bool rate = false;
+  for (const auto& rem : results) {
+    if (rem.rate_limited) {
+      rate = true;
+      break;
+    }
+  }
+  if (rate) {
+    status_.set_text(cache.apps.empty() ? "GitHub rate limit. Try again later."
+                                        : "GitHub rate limit. Showing cached versions.");
   }
   update_install_all();
 }

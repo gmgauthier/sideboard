@@ -9,6 +9,8 @@ namespace sideboard {
 struct Remote {
   bool ok = false;
   bool cached = false;
+  bool no_release = false;
+  bool rate_limited = false;
   std::string error;
   std::string tag;
   std::string upstream;
