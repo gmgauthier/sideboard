@@ -90,6 +90,13 @@ std::string cache_path()
   return Glib::build_filename(dir, "catalog.json");
 }
 
+std::string debs_dir()
+{
+  const std::string dir = Glib::build_filename(Glib::get_user_cache_dir(), "sideboard", "debs");
+  g_mkdir_with_parents(dir.c_str(), 0700);
+  return dir;
+}
+
 std::string config_path()
 {
   const std::string dir = Glib::build_filename(Glib::get_user_config_dir(), "sideboard");

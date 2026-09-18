@@ -5,8 +5,15 @@
 #include "cache.hpp"
 #include "catalog.hpp"
 #include "compare.hpp"
+#include "config.hpp"
+#include "fetch.hpp"
 #include "local.hpp"
 #include "paths.hpp"
+
+#include <glibmm.h>
+
+#include <algorithm>
+#include <sys/wait.h>
 
 namespace sideboard {
 namespace {
@@ -15,6 +22,7 @@ const int kColApp = 150;
 const int kColVer = 88;
 const int kColStatus = 140;
 const int kColAction = 108;
+const int kColRemove = 40;
 
 void size_label(Gtk::Label& lab, int width, float xalign)
 {
@@ -47,7 +55,8 @@ void set_status_class(Gtk::Label& lab, const char* klass)
 class AppRow : public Gtk::ListBoxRow {
  public:
   explicit AppRow(const App& app)
-      : package_(app.package)
+      : package_(app.package),
+        display_(app.display)
   {
     get_style_context()->add_class("sideboard-row");
     box_.set_spacing(8);
@@ -61,12 +70,24 @@ class AppRow : public Gtk::ListBoxRow {
     size_label(status_, kColStatus, 0);
     action_.set_sensitive(false);
     action_.set_size_request(kColAction, -1);
+    action_.signal_clicked().connect([this]() { signal_install_.emit(); });
+
+    auto theme = Gtk::IconTheme::get_default();
+    const char* icon = (theme && theme->has_icon("user-trash")) ? "user-trash" : "edit-delete";
+    remove_img_.set_from_icon_name(icon, Gtk::ICON_SIZE_MENU);
+    remove_.set_image(remove_img_);
+    remove_.set_always_show_image(true);
+    remove_.set_tooltip_text("Uninstall");
+    remove_.set_sensitive(false);
+    remove_.set_size_request(kColRemove, -1);
+    remove_.signal_clicked().connect([this]() { signal_remove_.emit(); });
 
     box_.pack_start(name_, Gtk::PACK_SHRINK);
     box_.pack_start(installed_, Gtk::PACK_SHRINK);
     box_.pack_start(available_, Gtk::PACK_SHRINK);
     box_.pack_start(status_, Gtk::PACK_EXPAND_WIDGET);
     box_.pack_start(action_, Gtk::PACK_SHRINK);
+    box_.pack_start(remove_, Gtk::PACK_SHRINK);
     add(box_);
     apply(query_installed(app.package), nullptr);
     show_all();
@@ -77,13 +98,39 @@ class AppRow : public Gtk::ListBoxRow {
     return package_;
   }
 
+  const char* display() const
+  {
+    return display_;
+  }
+
+  const Remote& remote() const
+  {
+    return remote_;
+  }
+
+  sigc::signal<void>& signal_install()
+  {
+    return signal_install_;
+  }
+
+  sigc::signal<void>& signal_remove()
+  {
+    return signal_remove_;
+  }
+
   void apply(const Installed& inst, const Remote* remote)
   {
+    if (remote)
+      remote_ = *remote;
+    else
+      remote_ = Remote{};
+
     installed_.set_text(inst.present ? Glib::ustring(inst.upstream) : Glib::ustring("—"));
     set_status_class(status_, nullptr);
     action_.set_sensitive(false);
+    remove_.set_sensitive(inst.present);
 
-    if (!remote) {
+    if (!remote_.ok && remote_.error.empty() && remote_.url.empty()) {
       available_.set_text("—");
       if (inst.present) {
         status_.set_text("—");
@@ -94,23 +141,26 @@ class AppRow : public Gtk::ListBoxRow {
       }
       return;
     }
-    if (!remote->ok) {
-      available_.set_text(remote->upstream.empty() ? "—" : remote->upstream);
+    if (!remote_.ok) {
+      available_.set_text(remote_.upstream.empty() ? "—" : remote_.upstream);
       status_.set_text("Error");
       set_status_class(status_, "sideboard-status-error");
       action_.set_label(inst.present ? "Upgrade" : "Install");
+      action_.set_sensitive(!remote_.url.empty());
       return;
     }
-    available_.set_text(remote->upstream);
+    available_.set_text(remote_.upstream);
     if (!inst.present) {
       status_.set_text("Not installed");
       action_.set_label("Install");
+      action_.set_sensitive(!remote_.url.empty());
       return;
     }
-    if (version_older(inst.debian, remote->debian)) {
+    if (version_older(inst.debian, remote_.debian)) {
       status_.set_text("Update available");
       set_status_class(status_, "sideboard-status-update");
       action_.set_label("Upgrade");
+      action_.set_sensitive(!remote_.url.empty());
       return;
     }
     status_.set_text("Up to date");
@@ -122,10 +172,44 @@ class AppRow : public Gtk::ListBoxRow {
   {
     set_status_class(status_, nullptr);
     status_.set_text("Checking…");
+    action_.set_sensitive(false);
+    remove_.set_sensitive(false);
+  }
+
+  void set_installing()
+  {
+    set_status_class(status_, nullptr);
+    status_.set_text("Installing…");
+    action_.set_sensitive(false);
+    remove_.set_sensitive(false);
+  }
+
+  void set_removing()
+  {
+    set_status_class(status_, nullptr);
+    status_.set_text("Removing…");
+    action_.set_sensitive(false);
+    remove_.set_sensitive(false);
+  }
+
+  void set_locked(bool on)
+  {
+    if (on) {
+      action_.set_sensitive(false);
+      remove_.set_sensitive(false);
+    } else {
+      apply(query_installed(package_), remote_.ok || !remote_.url.empty() ? &remote_ : nullptr);
+    }
   }
 
  private:
   const char* package_ = nullptr;
+  const char* display_ = nullptr;
+  Remote remote_;
+  sigc::signal<void> signal_install_;
+  sigc::signal<void> signal_remove_;
+  Gtk::Image remove_img_;
+  Gtk::Button remove_;
   Gtk::Box box_{Gtk::ORIENTATION_HORIZONTAL, 8};
   Gtk::Label name_;
   Gtk::Label installed_;
@@ -137,7 +221,8 @@ class AppRow : public Gtk::ListBoxRow {
 Window::Window()
 {
   set_title("Sideboard");
-  set_default_size(680, 440);
+  set_resizable(true);
+  set_default_size(760, -1);
   get_style_context()->add_class("sideboard-window");
   load_css();
   progress_conn_ = progress_dispatch_.connect(sigc::mem_fun(*this, &Window::on_refresh_progress));
@@ -149,6 +234,7 @@ Window::Window()
   apply_cache();
   show_all();
   progress_.hide();
+  size_to_list();
 }
 
 Window::~Window()
@@ -227,18 +313,20 @@ void Window::build_body()
   cols_.pack_start(*avail_head_, Gtk::PACK_SHRINK);
   cols_.pack_start(*col_header("Status", kColStatus, 0), Gtk::PACK_EXPAND_WIDGET);
   cols_.pack_start(*col_header("", kColAction, 0.5), Gtk::PACK_SHRINK);
+  cols_.pack_start(*col_header("", kColRemove, 0.5), Gtk::PACK_SHRINK);
   root_.pack_start(cols_, Gtk::PACK_SHRINK);
 
   list_.set_selection_mode(Gtk::SELECTION_SINGLE);
   list_.get_style_context()->add_class("sideboard-list");
   scroll_.add(list_);
-  scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+  scroll_.set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_NEVER);
+  scroll_.set_propagate_natural_height(true);
   scroll_.set_shadow_type(Gtk::SHADOW_IN);
   scroll_.set_hexpand(true);
-  scroll_.set_vexpand(true);
+  scroll_.set_vexpand(false);
   scroll_.set_margin_start(8);
   scroll_.set_margin_end(8);
-  root_.pack_start(scroll_, Gtk::PACK_EXPAND_WIDGET);
+  root_.pack_start(scroll_, Gtk::PACK_SHRINK);
 
   last_checked_.set_text("Last checked: —");
   last_checked_.set_xalign(0);
@@ -273,6 +361,8 @@ void Window::fill_rows()
   const App* apps = catalog(&n);
   for (std::size_t i = 0; i < n; ++i) {
     auto* row = Gtk::manage(new AppRow(apps[i]));
+    row->signal_install().connect([this, row]() { on_install(row); });
+    row->signal_remove().connect([this, row]() { on_uninstall(row); });
     list_.append(*row);
     rows_.push_back(row);
   }
@@ -306,6 +396,8 @@ void Window::set_busy(bool on)
   refresh_.set_sensitive(!on);
   if (refresh_item_)
     refresh_item_->set_sensitive(!on);
+  for (auto* row : rows_)
+    row->set_locked(on);
 }
 
 void Window::stop_refresh()
@@ -379,6 +471,10 @@ void Window::on_refresh_progress()
 
 void Window::on_refresh_done()
 {
+  if (install_row_) {
+    on_download_done();
+    return;
+  }
   if (refresh_thread_.joinable())
     refresh_thread_.join();
   set_busy(false);
@@ -422,6 +518,212 @@ void Window::on_refresh_done()
     if (avail_head_)
       avail_head_->set_text("Available");
   }
+}
+
+void Window::show_error(const Glib::ustring& msg)
+{
+  Gtk::MessageDialog dlg(*this, "Failed", false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_OK, true);
+  dlg.set_secondary_text(msg);
+  dlg.run();
+}
+
+std::string deb_basename(const std::string& url)
+{
+  auto slash = url.find_last_of('/');
+  std::string name = (slash == std::string::npos) ? url : url.substr(slash + 1);
+  const auto q = name.find('?');
+  if (q != std::string::npos)
+    name = name.substr(0, q);
+  return name;
+}
+
+bool Window::pkexec_helper(const char* verb, const std::string& arg, std::string& error)
+{
+  error.clear();
+  if (!Glib::file_test(HELPER_PATH, Glib::FILE_TEST_IS_EXECUTABLE)) {
+    error = "sideboard-helper is not installed at " HELPER_PATH
+            ".\nInstall it with: sudo ninja -C build install";
+    return false;
+  }
+  std::vector<std::string> argv = {"pkexec", HELPER_PATH, verb, arg};
+  std::string out;
+  std::string err;
+  int wait_status = 0;
+  try {
+    Glib::spawn_sync("", argv, Glib::SPAWN_SEARCH_PATH, Glib::SlotSpawnChildSetup(), &out, &err,
+                     &wait_status);
+  } catch (const Glib::Error& e) {
+    error = e.what();
+    return false;
+  }
+  if (out.compare(0, 3, "OK\n") == 0 || out == "OK")
+    return true;
+  std::string line = out;
+  if (line.compare(0, 4, "ERR ") == 0)
+    line = line.substr(4);
+  while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+    line.pop_back();
+  if (line.empty())
+    line = err;
+  while (!line.empty() && (line.back() == '\n' || line.back() == '\r'))
+    line.pop_back();
+  if (!WIFEXITED(wait_status) || WEXITSTATUS(wait_status) != 0) {
+    if (line.empty())
+      line = "Authentication cancelled or helper failed.";
+    error = line;
+    return false;
+  }
+  if (line.empty())
+    return true;
+  error = line;
+  return false;
+}
+
+void Window::on_install(AppRow* row)
+{
+  if (busy_ || !row)
+    return;
+  if (dpkg_architecture() != "amd64") {
+    Gtk::MessageDialog dlg(*this, "This machine is not amd64.", false, Gtk::MESSAGE_ERROR,
+                           Gtk::BUTTONS_OK, true);
+    dlg.set_secondary_text("Sideboard only installs amd64 .deb packages.");
+    dlg.run();
+    return;
+  }
+  const Remote rem = row->remote();
+  if (!rem.ok || rem.url.empty()) {
+    show_error("No download URL. Refresh first.");
+    return;
+  }
+  const std::string name = deb_basename(rem.url);
+  const std::string suffix = "_amd64.deb";
+  if (name.size() <= suffix.size() ||
+      name.compare(name.size() - suffix.size(), suffix.size(), suffix) != 0) {
+    show_error("Release asset is not a .deb.");
+    return;
+  }
+  install_row_ = row;
+  install_remote_ = rem;
+  install_dest_ = Glib::build_filename(debs_dir(), name);
+  install_error_.clear();
+  install_ok_ = false;
+  cancel_ = false;
+  set_busy(true);
+  row->set_installing();
+  status_.set_text("Downloading " + name + "…");
+  progress_.set_fraction(0);
+  progress_.show();
+  refresh_thread_ = std::thread([this]() { run_download(); });
+}
+
+void Window::run_download()
+{
+  std::string err;
+  const bool ok =
+      download_file(install_remote_.url, install_dest_, err, [this](long now, long total) {
+        std::lock_guard<std::mutex> lock(mu_);
+        progress_frac_ = (total > 0) ? static_cast<double>(now) / static_cast<double>(total) : 0;
+        progress_text_ = "Downloading…";
+        progress_dispatch_.emit();
+      });
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    install_ok_ = ok;
+    install_error_ = err;
+    progress_frac_ = 1;
+    progress_text_ = ok ? "Verifying…" : err;
+  }
+  done_dispatch_.emit();
+}
+
+void Window::on_download_done()
+{
+  if (refresh_thread_.joinable())
+    refresh_thread_.join();
+
+  AppRow* row = install_row_;
+  const Remote rem = install_remote_;
+  const std::string dest = install_dest_;
+  const bool dl_ok = install_ok_;
+  const std::string dl_err = install_error_;
+  install_row_ = nullptr;
+
+  if (!dl_ok) {
+    progress_.hide();
+    set_busy(false);
+    row->apply(query_installed(row->package()), &rem);
+    status_.set_text("Error");
+    show_error(dl_err.empty() ? "Download failed." : dl_err);
+    return;
+  }
+
+  if (!rem.digest.empty()) {
+    std::string hex_err;
+    const std::string hex = sha256_file(dest, hex_err);
+    if (hex.empty() || !digest_matches(rem.digest, hex)) {
+      progress_.hide();
+      set_busy(false);
+      row->apply(query_installed(row->package()), &rem);
+      status_.set_text("Error");
+      show_error(hex.empty() ? hex_err : "SHA-256 mismatch. The file was not installed.");
+      return;
+    }
+  }
+
+  status_.set_text("Installing…");
+  while (Gtk::Main::events_pending())
+    Gtk::Main::iteration();
+
+  std::string err;
+  const bool ok = pkexec_helper("install", dest, err);
+  progress_.hide();
+  set_busy(false);
+  row->apply(query_installed(row->package()), &rem);
+  if (!ok) {
+    status_.set_text("Error");
+    show_error(err.empty() ? "Install failed." : err);
+    return;
+  }
+  status_.set_text("Installed " + Glib::ustring(row->package()) + ".");
+}
+
+void Window::size_to_list()
+{
+  int min_h = 0, nat_h = 0;
+  get_preferred_height(min_h, nat_h);
+  int w = 0, h = 0;
+  get_size(w, h);
+  if (nat_h > 0)
+    resize(std::max(w, 760), nat_h);
+}
+
+void Window::on_uninstall(AppRow* row)
+{
+  if (busy_ || !row)
+    return;
+  Gtk::MessageDialog ask(*this, Glib::ustring("Uninstall ") + row->display() + "?", false,
+                         Gtk::MESSAGE_QUESTION, Gtk::BUTTONS_YES_NO, true);
+  ask.set_secondary_text(Glib::ustring("This runs apt-get remove on ") + row->package() + ".");
+  if (ask.run() != Gtk::RESPONSE_YES)
+    return;
+
+  set_busy(true);
+  row->set_removing();
+  status_.set_text(Glib::ustring("Removing ") + row->display() + "…");
+  while (Gtk::Main::events_pending())
+    Gtk::Main::iteration();
+
+  std::string err;
+  const bool ok = pkexec_helper("remove", row->package(), err);
+  set_busy(false);
+  const Remote rem = row->remote();
+  row->apply(query_installed(row->package()), rem.ok || !rem.url.empty() ? &rem : nullptr);
+  if (!ok) {
+    status_.set_text("Error");
+    show_error(err.empty() ? "Remove failed." : err);
+    return;
+  }
+  status_.set_text(Glib::ustring("Removed ") + row->display() + ".");
 }
 
 void Window::on_about()

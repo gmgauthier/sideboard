@@ -47,4 +47,22 @@ Installed query_installed(const char* package)
   return out;
 }
 
+std::string dpkg_architecture()
+{
+  std::string stdout_buf;
+  std::string stderr_buf;
+  int wait_status = 0;
+  try {
+    Glib::spawn_command_line_sync("dpkg --print-architecture", &stdout_buf, &stderr_buf,
+                                  &wait_status);
+  } catch (const Glib::Error&) {
+    return {};
+  }
+  if (!WIFEXITED(wait_status) || WEXITSTATUS(wait_status) != 0)
+    return {};
+  while (!stdout_buf.empty() && (stdout_buf.back() == '\n' || stdout_buf.back() == '\r'))
+    stdout_buf.pop_back();
+  return stdout_buf;
+}
+
 }  // namespace sideboard

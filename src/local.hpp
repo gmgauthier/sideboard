@@ -14,5 +14,6 @@ struct Installed {
 
 Installed query_installed(const char* package);
 std::string display_upstream(const std::string& debian_version);
+std::string dpkg_architecture();
 
 }  // namespace sideboard
