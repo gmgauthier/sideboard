@@ -8,6 +8,6 @@ LCOS itself: [https://github.com/BryanLunduke/LCOS](https://github.com/BryanLund
 
 ![Sideboard mock](brand/mockup.jpg)
 
-Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **M2** — Refresh plus Install/Upgrade of one `.deb` via `sideboard-helper`.
+Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **M3** — sequential **Install all updates** of pending upgrades.
 
 License: The Unlicense (`UNLICENSE`).

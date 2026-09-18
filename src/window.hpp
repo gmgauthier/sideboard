@@ -34,10 +34,13 @@ class Window : public Gtk::Window {
   void on_refresh_progress();
   void on_refresh_done();
   void on_install(AppRow* row);
+  void on_install_all();
   void on_uninstall(AppRow* row);
+  bool begin_download(AppRow* row);
   void run_download();
   void on_download_done();
   void set_busy(bool on);
+  void update_install_all();
   void stop_refresh();
   void size_to_list();
   void show_error(const Glib::ustring& msg);
@@ -76,6 +79,8 @@ class Window : public Gtk::Window {
   std::string install_dest_;
   std::string install_error_;
   bool install_ok_ = false;
+  std::vector<AppRow*> batch_;
+  std::size_t batch_index_ = 0;
   Glib::Dispatcher progress_dispatch_;
   Glib::Dispatcher done_dispatch_;
   sigc::connection progress_conn_;
