@@ -73,3 +73,8 @@ install_data(
   'data/org.gmgauthier.sideboard.policy',
   install_dir: get_option('datadir') / 'polkit-1' / 'actions',
 )
+
+install_data(
+  'data/sideboard.svg',
+  install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
+)

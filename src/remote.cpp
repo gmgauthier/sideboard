@@ -241,6 +241,15 @@ Remote fetch_latest(const char* owner, const char* repo, const char* package)
   std::string err;
   const std::string body = http_get(url, err);
   if (body.empty()) {
+    if (err == "HTTP 404") {
+      r.no_release = true;
+      return r;
+    }
+    if (err == "HTTP 403" || err == "HTTP 429") {
+      r.rate_limited = true;
+      r.error = err;
+      return r;
+    }
     r.error = err.empty() ? "Empty response" : err;
     return r;
   }

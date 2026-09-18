@@ -18,6 +18,8 @@ const App kApps[] = {
      "Calendar and day pages for LCOS."},
     {"partyline", "Partyline", "partyline", "gmgauthier", "partyline", "IRC client for LCOS."},
     {"dispatch", "Dispatch", "dispatch", "gmgauthier", "dispatch", "RSS/Atom reader for LCOS."},
+    {"sideboard", "Sideboard", "sideboard", "gmgauthier", "sideboard",
+     "Guest-suite cabinet for LCOS. Not an official LCOS updater."},
 };
 
 }  // namespace
