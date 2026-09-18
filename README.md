@@ -6,7 +6,7 @@ Sideboard is a cabinet for the guest applications written for The Lunduke Comput
 
 LCOS itself: [https://github.com/BryanLunduke/LCOS](https://github.com/BryanLunduke/LCOS)
 
-![Sideboard mock](brand/mockup.jpg)
+![Sideboard on LCOS](brand/screenshot.png)
 
 Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **M4** — Debian package. See [INSTALL.md](INSTALL.md).
 
