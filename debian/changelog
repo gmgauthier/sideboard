@@ -1,3 +1,10 @@
+sideboard (0.1.1-1) unstable; urgency=medium
+
+  * Paint Install/Upgrade buttons on the white list so they are visible
+    at rest, not only on hover.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 18 Sep 2026 22:19:49 +0100
+
 sideboard (0.1.0-1) unstable; urgency=medium
 
   * Initial release. Guest-suite cabinet for LCOS (milestones M0–M4).
