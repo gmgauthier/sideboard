@@ -29,35 +29,36 @@ list.sideboard-list {
   color: #000000;
 }
 
-list.sideboard-list row {
+list.sideboard-list row,
+list.sideboard-list row:hover,
+list.sideboard-list row:selected,
+list.sideboard-list row:selected:focus {
   background-color: #FFFFFF;
   color: #000000;
+  box-shadow: none;
 }
 
 list.sideboard-list row label {
   color: #000000;
 }
 
-/* Same selected well as EarBlaster / Read-O-Matic. Labels must be set
- * explicitly: GtkListBox does not push :selected color onto children. */
-list.sideboard-list row:selected,
-list.sideboard-list row:selected:focus {
-  background-color: #5E84B0;
-  color: #FFFFFF;
-}
-
-list.sideboard-list row:selected label,
-list.sideboard-list row:selected:focus label {
-  color: #FFFFFF;
-  background-color: transparent;
-}
-
-/* GtkButton has a child label; keep that text dark on the button face. */
-list.sideboard-list row:selected button,
-list.sideboard-list row:selected:focus button,
-list.sideboard-list row:selected button label,
-list.sideboard-list row:selected:focus button label {
+button.sideboard-action:hover,
+button.sideboard-action:hover label {
   color: #000000;
+}
+
+/* Default hover lightens the face and washes out the icon. */
+button.sideboard-remove {
+  background-image: none;
+  background-color: #D4D0C8;
+  color: #000000;
+}
+
+button.sideboard-remove:hover,
+button.sideboard-remove:active {
+  background-image: none;
+  background-color: #6E6C66;
+  color: #FFFFFF;
 }
 
 .sideboard-status-update {
