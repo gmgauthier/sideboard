@@ -42,20 +42,37 @@ list.sideboard-list row label {
   color: #000000;
 }
 
-button.sideboard-action:hover,
-button.sideboard-action:hover label {
+/* Row background is white; without an explicit face the enabled
+ * Install/Upgrade button is white-on-white until prelight. */
+list.sideboard-list row button.sideboard-action,
+list.sideboard-list row button.sideboard-action label {
+  background-image: none;
+  background-color: #D4D0C8;
+  color: #000000;
+  opacity: 1;
+}
+
+list.sideboard-list row button.sideboard-action:disabled,
+list.sideboard-list row button.sideboard-action:disabled label {
+  background-color: #D4D0C8;
+  color: #7A7A72;
+}
+
+list.sideboard-list row button.sideboard-action:hover:not(:disabled),
+list.sideboard-list row button.sideboard-action:hover:not(:disabled) label {
+  background-color: #B8B6AE;
   color: #000000;
 }
 
 /* Default hover lightens the face and washes out the icon. */
-button.sideboard-remove {
+list.sideboard-list row button.sideboard-remove {
   background-image: none;
   background-color: #D4D0C8;
   color: #000000;
 }
 
-button.sideboard-remove:hover,
-button.sideboard-remove:active {
+list.sideboard-list row button.sideboard-remove:hover,
+list.sideboard-list row button.sideboard-remove:active {
   background-image: none;
   background-color: #6E6C66;
   color: #FFFFFF;

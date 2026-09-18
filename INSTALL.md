@@ -8,7 +8,7 @@ Two ways to get a binary, in the order LCOS cares about:
 | **Source tarball** | Distro packagers and `meson setup && ninja install`. |
 | **Git build** | Developers. See below. |
 
-There is no AppImage. Version comes from `meson.build` (currently `0.1.0`).
+There is no AppImage. Version comes from `meson.build` (currently `0.1.1`).
 
 ## Runtime needs
 
@@ -28,14 +28,14 @@ sudo apt install libgtkmm-3.0-1t64 libcurl4t64 pkexec apt
 From a release `.deb`:
 
 ```
-sudo apt install ./dist/sideboard_0.1.0-1_amd64.deb
+sudo apt install ./dist/sideboard_0.1.1-1_amd64.deb
 ```
 
 Or, from this tree:
 
 ```
 ./scripts/release.sh deb
-sudo apt install ./dist/sideboard_0.1.0-1_amd64.deb
+sudo apt install ./dist/sideboard_0.1.1-1_amd64.deb
 ```
 
 That installs:
