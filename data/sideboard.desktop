@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Sideboard
+Comment=Guest software for The Lunduke Computer Operating System (not an official LCOS updater)
+Exec=sideboard
+Icon=sideboard
+Terminal=false
+Hidden=false
+Categories=GTK;System;
+StartupWMClass=sideboard
+StartupNotify=true

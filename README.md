@@ -8,6 +8,6 @@ LCOS itself: [https://github.com/BryanLunduke/LCOS](https://github.com/BryanLund
 
 ![Sideboard mock](brand/mockup.jpg)
 
-Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md).
+Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **M1** — Refresh reads GitHub `releases/latest`. Install is not wired yet.
 
 License: The Unlicense (`UNLICENSE`).

@@ -1,0 +1,69 @@
+/* Sideboard lcos skin — GTK3 CSS.
+ * Decorations stay with Clearlooks / Phenix. We tint the banner and list.
+ */
+
+window.sideboard-window {
+  background-color: #E6E6E1;
+}
+
+.sideboard-banner {
+  background-color: #0B1D38;
+}
+
+.sideboard-banner-title {
+  color: #E8F2FF;
+  font-weight: bold;
+  font-size: 15pt;
+}
+
+.sideboard-banner-caption {
+  color: #E8F2FF;
+}
+
+.sideboard-colhead {
+  font-weight: bold;
+}
+
+list.sideboard-list {
+  background-color: #FFFFFF;
+  color: #000000;
+}
+
+list.sideboard-list row {
+  background-color: #FFFFFF;
+  color: #000000;
+}
+
+list.sideboard-list row label {
+  color: #000000;
+}
+
+/* Same selected well as EarBlaster / Read-O-Matic. Labels must be set
+ * explicitly: GtkListBox does not push :selected color onto children. */
+list.sideboard-list row:selected,
+list.sideboard-list row:selected:focus {
+  background-color: #5E84B0;
+  color: #FFFFFF;
+}
+
+list.sideboard-list row:selected label,
+list.sideboard-list row:selected:focus label {
+  color: #FFFFFF;
+  background-color: transparent;
+}
+
+.sideboard-status-update {
+  color: #8A5A00;
+}
+
+.sideboard-status-ok {
+  color: #1A6B2A;
+}
+
+.sideboard-status-error {
+  color: #8B1A1A;
+}
+
+statusbar {
+  background-color: #D4D0C8;
+}
