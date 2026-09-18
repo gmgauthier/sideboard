@@ -13,12 +13,15 @@ project(
 
 gtkmm = dependency('gtkmm-3.0')
 libcurl = dependency('libcurl')
+libcrypto = dependency('libcrypto')
+glib = dependency('glib-2.0')
 
 conf = configuration_data()
 conf.set_quoted('VERSION', meson.project_version())
 conf.set_quoted('APP_ID', 'org.gmgauthier.Sideboard')
 conf.set_quoted('DATADIR', get_option('prefix') / get_option('datadir') / 'sideboard')
 conf.set_quoted('SOURCE_ROOT', meson.project_source_root())
+conf.set_quoted('HELPER_PATH', join_paths(get_option('prefix'), get_option('libexecdir'), 'sideboard-helper'))
 
 configure_file(
   output: 'config.hpp',
@@ -39,10 +42,21 @@ executable(
   'src/remote.cpp',
   'src/compare.cpp',
   'src/cache.cpp',
+  'src/fetch.cpp',
   include_directories: inc,
-  dependencies: [gtkmm, libcurl],
+  dependencies: [gtkmm, libcurl, libcrypto],
   install: true,
   install_dir: get_option('bindir'),
+)
+
+executable(
+  'sideboard-helper',
+  'src/helper.cpp',
+  'src/catalog.cpp',
+  include_directories: inc,
+  dependencies: [glib],
+  install: true,
+  install_dir: get_option('libexecdir'),
 )
 
 install_data(
@@ -53,4 +67,9 @@ install_data(
 install_data(
   'data/sideboard.css',
   install_dir: get_option('datadir') / 'sideboard',
+)
+
+install_data(
+  'data/org.gmgauthier.sideboard.policy',
+  install_dir: get_option('datadir') / 'polkit-1' / 'actions',
 )

@@ -52,6 +52,14 @@ list.sideboard-list row:selected:focus label {
   background-color: transparent;
 }
 
+/* GtkButton has a child label; keep that text dark on the button face. */
+list.sideboard-list row:selected button,
+list.sideboard-list row:selected:focus button,
+list.sideboard-list row:selected button label,
+list.sideboard-list row:selected:focus button label {
+  color: #000000;
+}
+
 .sideboard-status-update {
   color: #8A5A00;
 }

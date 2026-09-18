@@ -15,6 +15,7 @@ struct CatalogCache {
 };
 
 std::string cache_path();
+std::string debs_dir();
 std::string config_path();
 CatalogCache load_cache();
 void save_cache(const CatalogCache& cache);

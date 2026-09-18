@@ -33,8 +33,15 @@ class Window : public Gtk::Window {
   void run_refresh();
   void on_refresh_progress();
   void on_refresh_done();
+  void on_install(AppRow* row);
+  void on_uninstall(AppRow* row);
+  void run_download();
+  void on_download_done();
   void set_busy(bool on);
   void stop_refresh();
+  void size_to_list();
+  void show_error(const Glib::ustring& msg);
+  bool pkexec_helper(const char* verb, const std::string& arg, std::string& error);
 
   Gtk::Box root_{Gtk::ORIENTATION_VERTICAL, 0};
   Gtk::MenuBar menubar_;
@@ -64,6 +71,11 @@ class Window : public Gtk::Window {
   std::string refresh_banner_;
   std::atomic<bool> cancel_{false};
   bool busy_ = false;
+  AppRow* install_row_ = nullptr;
+  Remote install_remote_;
+  std::string install_dest_;
+  std::string install_error_;
+  bool install_ok_ = false;
   Glib::Dispatcher progress_dispatch_;
   Glib::Dispatcher done_dispatch_;
   sigc::connection progress_conn_;
