@@ -25,8 +25,11 @@ It is a *cabinet* for side-loaded programs that sit beside the official ISO, not
 - Not `lcos-updates`. Official LCOS updates stay in Bryan’s app (`apt-get update` / `upgrade` against the signed overlay at `lcos.lunduke.com`).
 - Not a way to paste an arbitrary GitHub URL and install a random `.deb`.
 - Not branded with Bryan Lunduke’s seal. Borrow the navy/ice/gray palette; do not pretend this is house software.
+- **Not affiliated.** These are independent apps Greg wrote to run on LCOS. There is no collaboration, affiliation, or agreement with Bryan or with LCOS. Do not presume that will change.
 
 Window copy must say guest / GitHub / not official, every time the window is open.
+
+Bryan’s property is an impenetrable boundary: `lcos.lunduke.com`, the signed overlay, `lcos-updates`, and Bryan’s seal. Sideboard never talks to them. That is **barred**, not parked.
 
 The old backlog rule still holds: Synaptic + `lcos-updates` remain OS policy.
 
@@ -407,9 +410,14 @@ After M4, adding Sideboard as catalog row eight is a point release.
 - Remote catalog
 - Any architecture other than amd64
 - GitHub authentication
-- Anything that talks to `lcos.lunduke.com`
 - “Install missing” as a separate verb
 - Becoming a general `.deb` sideload tool
+
+### Barred (until further notice)
+
+- Anything that talks to `lcos.lunduke.com`
+- Calling `apt-get update` / `upgrade` against the LCOS overlay
+- Pretending Sideboard is house software, a store, or a collaborator with Bryan / LCOS
 
 ---
 
