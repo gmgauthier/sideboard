@@ -1,6 +1,6 @@
 # Sideboard — directional guide for Grok Build
 
-Guest-suite installer / updater for the seven third-party LCOS applications.
+Guest-suite installer / updater for the third-party LCOS applications.
 This file is the plan of record. Implement against it; do not invent a store.
 
 Written 2026-09-18. Audience for the first cut: Greg + Grok Build the same night.
@@ -57,7 +57,7 @@ Acceptable alternates if Sideboard is taken: Cupboard, The Rack. Do not bikeshed
 
 ---
 
-## 4. The seven apps (allow-list)
+## 4. The catalog (allow-list)
 
 All under `https://github.com/gmgauthier`. All Unlicense. All gtkmm-3 / Meson. All ship a release `.deb` named:
 
@@ -76,6 +76,8 @@ Inventory as of 2026-09-18. Versions move; the *pattern* does not.
 | Ephemeris | `ephemeris` | `gmgauthier/ephemeris` | v0.1.1 | `ephemeris_0.1.1-1_amd64.deb` |
 | Partyline | `partyline` | `gmgauthier/partyline` | v0.2.0 | `partyline_0.2.0-1_amd64.deb` |
 | Dispatch | `dispatch` | `gmgauthier/dispatch` | v0.1.1 | `dispatch_0.1.1-1_amd64.deb` |
+| Needle | `needle` | `gmgauthier/needle` | v0.1.0 | `needle_0.1.0-1_amd64.deb` |
+| Tally | `tally` | `gmgauthier/tally` | v0.1.0 | `tally_0.1.0-1_amd64.deb` |
 
 Each release also publishes an AppImage and a `.tar.xz`. **Sideboard ignores those.** Preferred install on LCOS is the `.deb`, same as every suite README:
 
