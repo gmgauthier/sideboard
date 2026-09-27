@@ -1,3 +1,9 @@
+sideboard (0.3.0-1) unstable; urgency=medium
+
+  * Add Listen-O-Matic 1.0.0 to the catalog.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Sun, 27 Sep 2026 16:04:09 +0100
+
 sideboard (0.2.0-1) unstable; urgency=medium
 
   * Add Needle and Tally to the catalog.

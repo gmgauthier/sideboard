@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.2.0',
+  version: '0.3.0',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [

@@ -78,6 +78,7 @@ Inventory as of 2026-09-18. Versions move; the *pattern* does not.
 | Dispatch | `dispatch` | `gmgauthier/dispatch` | v0.1.1 | `dispatch_0.1.1-1_amd64.deb` |
 | Needle | `needle` | `gmgauthier/needle` | v0.1.0 | `needle_0.1.0-1_amd64.deb` |
 | Tally | `tally` | `gmgauthier/tally` | v0.1.0 | `tally_0.1.0-1_amd64.deb` |
+| Listen-O-Matic | `listenomatic` | `gmgauthier/listenomatic` | v1.0.0 | `listenomatic_1.0.0-1_amd64.deb` |
 
 Each release also publishes an AppImage and a `.tar.xz`. **Sideboard ignores those.** Preferred install on LCOS is the `.deb`, same as every suite README:
 
@@ -216,7 +217,7 @@ User-Agent: sideboard/0.1 (+https://github.com/gmgauthier/sideboard)
 
 Read `tag_name` (`v1.0.0` → `1.0.0`). Pick the asset whose name matches `{package}_*_amd64.deb`. Store `browser_download_url`, size, and `digest` if present.
 
-Seven GETs per Refresh.
+One GET per catalog row on Refresh.
 
 ### Compare
 
@@ -473,7 +474,7 @@ Do not share a polkit action. Do not shell out to `lcos-updates-helper`.
 
 ## 15. First README paragraph (use this tone)
 
-Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris, Partyline, and Dispatch; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
+Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris, Partyline, Dispatch, Needle, Tally, Listen-O-Matic, and itself; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
 
 ---
 
