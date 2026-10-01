@@ -78,3 +78,14 @@ install_data(
   'data/sideboard.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
 )
+
+sideboard_tests = executable(
+  'sideboard-tests',
+  'tests/test_version.cpp',
+  'src/compare.cpp',
+  'src/local.cpp',
+  'src/catalog.cpp',
+  include_directories: inc,
+  dependencies: [gtkmm],
+)
+test('version', sideboard_tests)
