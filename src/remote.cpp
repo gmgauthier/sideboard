@@ -138,11 +138,21 @@ size_t curl_write(char* ptr, size_t size, size_t nmemb, void* userdata)
   return n;
 }
 
+int cancel_xfer(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
+{
+  const auto* cancel = static_cast<const std::atomic<bool>*>(clientp);
+  return (cancel && cancel->load()) ? 1 : 0;
+}
+
 }  // namespace
 
-std::string http_get(const std::string& url, std::string& error)
+std::string http_get(const std::string& url, std::string& error, const std::atomic<bool>* cancel)
 {
   error.clear();
+  if (cancel && cancel->load()) {
+    error = "Cancelled";
+    return {};
+  }
   CURL* curl = curl_easy_init();
   if (!curl) {
     error = "curl init failed";
@@ -161,13 +171,18 @@ std::string http_get(const std::string& url, std::string& error)
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
   curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https,http");
+  if (cancel) {
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, cancel_xfer);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, const_cast<std::atomic<bool>*>(cancel));
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+  }
   const CURLcode rc = curl_easy_perform(curl);
   long status = 0;
   curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
   curl_slist_free_all(headers);
   curl_easy_cleanup(curl);
   if (rc != CURLE_OK) {
-    error = curl_easy_strerror(rc);
+    error = (rc == CURLE_ABORTED_BY_CALLBACK) ? "Cancelled" : curl_easy_strerror(rc);
     return {};
   }
   if (status == 403 || status == 429) {
@@ -229,7 +244,8 @@ Remote parse_latest_release(const std::string& json, const char* package)
   return r;
 }
 
-Remote fetch_latest(const char* owner, const char* repo, const char* package)
+Remote fetch_latest(const char* owner, const char* repo, const char* package,
+                    const std::atomic<bool>* cancel)
 {
   Remote r;
   if (!owner || !repo || !package) {
@@ -239,7 +255,7 @@ Remote fetch_latest(const char* owner, const char* repo, const char* package)
   const std::string url =
       std::string("https://api.github.com/repos/") + owner + "/" + repo + "/releases/latest";
   std::string err;
-  const std::string body = http_get(url, err);
+  const std::string body = http_get(url, err, cancel);
   if (body.empty()) {
     if (err == "HTTP 404") {
       r.no_release = true;

@@ -1,3 +1,9 @@
+sideboard (0.3.7-1) unstable; urgency=medium
+
+  * Close or Quit cancels a running download or release check.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 02 Oct 2026 10:23:33 +0100
+
 sideboard (0.3.6-1) unstable; urgency=medium
 
   * Re-installing the helper's cached copy no longer empties it.

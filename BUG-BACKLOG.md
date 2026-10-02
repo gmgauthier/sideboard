@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), `tests/test_helper.cpp` (`helper`), and `tests/test_fetch.cpp` (`fetch`). `fetch` points a download and a release check at a local server that stalls, sets the cancel flag, and checks that each returns within a few seconds and that the partial download is removed. `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### Close or Quit blocks the UI thread for the rest of the transfer
-
-- Severity: incorrect
-- Confidence: high
-- Where: `src/window.cpp:265`, `src/window.cpp:451`, `src/window.cpp:730`
-- Trigger: Start a download or a refresh, then close the window or choose Quit before it finishes.
-- Outcome: The destructor calls `stop_refresh()`, which joins `refresh_thread_` on the UI thread. `run_download()` never reads `cancel_`. The curl progress callback does not abort, and the download timeout is 300 seconds. A stalled download freezes quit for that long. The deb is not installed, because the done handler was disconnected before the join.
 
 ### A partial refresh shows stale cache as a live result
 
@@ -31,6 +23,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### Close or Quit blocks the UI thread for the rest of the transfer
+
+- Severity: incorrect
+- Confidence: high
+- Where: `src/window.cpp` `stop_refresh`, `run_download`, `src/fetch.cpp` `download_file`, `src/remote.cpp` `http_get`
+- Trigger: Start a download or a refresh, then close the window or choose Quit before it finishes.
+- Outcome: The destructor calls `stop_refresh()`, which joins `refresh_thread_` on the UI thread. `run_download()` never reads `cancel_`. The curl progress callback does not abort, and the download timeout is 300 seconds. A stalled download freezes quit for that long. The deb is not installed, because the done handler was disconnected before the join.
+- Fixed in v0.3.7: The download and each release check read the cancel flag from curl's progress callback and abort. Close or Quit joins a worker that stops within about a second, instead of waiting out a 300-second download timeout.
 
 ### Re-install from `/var/cache/sideboard` truncates the deb
 

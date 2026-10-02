@@ -487,7 +487,7 @@ void Window::run_refresh()
       progress_frac_ = (n == 0) ? 0 : static_cast<double>(i) / static_cast<double>(n);
     }
     progress_dispatch_.emit();
-    results[i] = fetch_latest(apps[i].owner, apps[i].repo, apps[i].package);
+    results[i] = fetch_latest(apps[i].owner, apps[i].repo, apps[i].package, &cancel_);
     if (results[i].rate_limited) {
       for (std::size_t j = i + 1; j < n; ++j) {
         results[j].rate_limited = true;
@@ -730,13 +730,15 @@ void Window::on_install_all()
 void Window::run_download()
 {
   std::string err;
-  const bool ok =
-      download_file(install_remote_.url, install_dest_, err, [this](long now, long total) {
+  const bool ok = download_file(
+      install_remote_.url, install_dest_, err,
+      [this](long now, long total) {
         std::lock_guard<std::mutex> lock(mu_);
         progress_frac_ = (total > 0) ? static_cast<double>(now) / static_cast<double>(total) : 0;
         progress_text_ = "Downloading…";
         progress_dispatch_.emit();
-      });
+      },
+      &cancel_);
   {
     std::lock_guard<std::mutex> lock(mu_);
     install_ok_ = ok;
