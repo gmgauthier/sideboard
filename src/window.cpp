@@ -7,6 +7,7 @@
 #include "compare.hpp"
 #include "config.hpp"
 #include "fetch.hpp"
+#include "helper_args.hpp"
 #include "local.hpp"
 #include "paths.hpp"
 
@@ -604,7 +605,7 @@ std::string deb_basename(const std::string& url)
   return name;
 }
 
-bool Window::pkexec_helper(const char* verb, const std::string& arg, std::string& error)
+bool Window::pkexec_helper(const std::vector<std::string>& argv, std::string& error)
 {
   error.clear();
   if (!Glib::file_test(HELPER_PATH, Glib::FILE_TEST_IS_EXECUTABLE)) {
@@ -612,7 +613,6 @@ bool Window::pkexec_helper(const char* verb, const std::string& arg, std::string
             ".\nInstall it with: sudo ninja -C build install";
     return false;
   }
-  std::vector<std::string> argv = {"pkexec", HELPER_PATH, verb, arg};
   std::string out;
   std::string err;
   int wait_status = 0;
@@ -791,7 +791,7 @@ void Window::on_download_done()
     Gtk::Main::iteration();
 
   std::string err;
-  const bool ok = pkexec_helper("install", dest, err);
+  const bool ok = pkexec_helper(helper_install_argv(HELPER_PATH, dest, rem.digest), err);
   row->apply(query_installed(row->package()), &rem);
   if (!ok) {
     fail_batch(err.empty() ? "Install failed." : err);
@@ -850,7 +850,7 @@ void Window::on_uninstall(AppRow* row)
     Gtk::Main::iteration();
 
   std::string err;
-  const bool ok = pkexec_helper("remove", row->package(), err);
+  const bool ok = pkexec_helper({"pkexec", HELPER_PATH, "remove", row->package()}, err);
   set_busy(false);
   const Remote rem = row->remote();
   row->apply(query_installed(row->package()), rem.ok || !rem.url.empty() ? &rem : nullptr);

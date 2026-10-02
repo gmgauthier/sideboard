@@ -8,6 +8,6 @@ LCOS itself: [https://github.com/BryanLunduke/LCOS](https://github.com/BryanLund
 
 ![Sideboard on LCOS](brand/screenshot.png)
 
-Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **v0.3.4** — catalog includes Listen-O-Matic. Headless test suite and BUG-BACKLOG.md. See [INSTALL.md](INSTALL.md).
+Plan of record: [DEVELOPMENT.md](DEVELOPMENT.md). Current cut: **v0.3.5** — catalog includes Listen-O-Matic. Headless test suite and BUG-BACKLOG.md. See [INSTALL.md](INSTALL.md).
 
 License: The Unlicense (`UNLICENSE`).

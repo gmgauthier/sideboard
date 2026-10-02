@@ -1,11 +1,14 @@
 /* SPDX-License-Identifier: Unlicense */
 
 #include "helper_core.hpp"
+#include "helper_args.hpp"
 #include "check.hpp"
 
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <string>
@@ -159,6 +162,64 @@ void test_install_refuses_symlink_and_keeps_copy_private()
   CHECK(!exists(failing.last_arg));
 }
 
+std::string sha256_of(const std::string& path)
+{
+  const std::string cmd = "sha256sum '" + path + "'";
+  FILE* p = ::popen(cmd.c_str(), "r");
+  if (!p)
+    return {};
+  char buf[65] = {0};
+  const std::size_t n = std::fread(buf, 1, 64, p);
+  ::pclose(p);
+  return n == 64 ? std::string(buf, 64) : std::string();
+}
+
+void test_install_checks_digest_on_roots_copy()
+{
+  const std::string cache = g_root + "/cache-digest";
+  const std::string good = make_deb("tally", "tally_1.0.2-1_amd64.deb");
+  const std::string hex = sha256_of(good);
+  CHECK(hex.size() == 64);
+
+  /* The digest the GUI checked does not match the file root copied: refused. */
+  const std::string other = make_deb("needle", "needle_1.0.0-1_amd64.deb");
+  FakeApt swapped;
+  h::Result r = h::install_deb(other.c_str(), cache, swapped.runner(), "sha256:" + hex);
+  CHECK(r.code != 0);
+  CHECK(swapped.calls == 0);
+  CHECK(!exists(cache + "/needle_1.0.0-1_amd64.deb"));
+
+  /* A matching digest installs, in either case. */
+  FakeApt ok;
+  r = h::install_deb(good.c_str(), cache, ok.runner(), "sha256:" + hex);
+  CHECK(r.code == 0);
+  CHECK(ok.calls == 1);
+  std::string upper = hex;
+  for (auto& c : upper)
+    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  FakeApt ok_upper;
+  CHECK(h::install_deb(good.c_str(), cache, ok_upper.runner(), "sha256:" + upper).code == 0);
+
+  /* A malformed digest is refused. */
+  FakeApt bad;
+  CHECK(h::install_deb(good.c_str(), cache, bad.runner(), "md5:abc").code == 2);
+  CHECK(h::install_deb(good.c_str(), cache, bad.runner(), "sha256:" + hex.substr(1)).code == 2);
+  CHECK(bad.calls == 0);
+
+  /* The GUI hands the published digest to the helper. */
+  const auto with = sideboard::helper_install_argv("/usr/libexec/sideboard-helper", good,
+                                                   "sha256:" + hex);
+  CHECK(with.size() == 5);
+  CHECK(with[0] == "pkexec");
+  CHECK(with[2] == "install");
+  CHECK(with[3] == good);
+  CHECK(with.size() == 5 && with[4] == "sha256:" + hex);
+  const auto without = sideboard::helper_install_argv("/usr/libexec/sideboard-helper", good, "");
+  CHECK(without.size() == 4);
+  const auto bare = sideboard::helper_install_argv("/usr/libexec/sideboard-helper", good, hex);
+  CHECK(bare.size() == 5 && bare[4] == "sha256:" + hex);
+}
+
 }  // namespace
 
 int main()
@@ -173,6 +234,7 @@ int main()
   test_install_only_catalog_packages();
   test_remove_only_catalog_packages();
   test_install_refuses_symlink_and_keeps_copy_private();
+  test_install_checks_digest_on_roots_copy();
 
   const std::string rm = "rm -rf '" + g_root + "'";
   if (std::system(rm.c_str()) != 0)
