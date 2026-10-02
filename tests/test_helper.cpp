@@ -4,13 +4,16 @@
 #include "helper_args.hpp"
 #include "check.hpp"
 
+#include <signal.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <fstream>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -253,6 +256,44 @@ void test_reinstall_from_cache_keeps_the_deb()
   CHECK(size_of(cached) == size);
 }
 
+/* True once PID has exited (gone, or a zombie waiting for its new parent). */
+bool process_gone(long pid)
+{
+  if (::kill(static_cast<pid_t>(pid), 0) != 0)
+    return true;
+  std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
+  std::string line;
+  std::getline(stat, line);
+  const auto close = line.rfind(')');
+  return close != std::string::npos && close + 2 < line.size() && line[close + 2] == 'Z';
+}
+
+void test_timeout_kills_the_whole_process_group()
+{
+  /* The shell stands in for apt-get; its background sleep stands in for dpkg. */
+  std::string out;
+  const auto start = std::chrono::steady_clock::now();
+  const int rc =
+      h::run_capture({"/bin/sh", "-c", "sleep 30 & echo $!; wait"}, 1, out);
+  const double took =
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  CHECK(rc == -1);
+  CHECK(took < 10.0);
+  const long child = std::atol(out.c_str());
+  CHECK(child > 0);
+  if (child <= 0)
+    return;
+  bool gone = false;
+  for (int i = 0; i < 40 && !gone; ++i) {
+    gone = process_gone(child);
+    if (!gone)
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+  CHECK(gone);
+  if (!gone)
+    ::kill(static_cast<pid_t>(child), SIGKILL);
+}
+
 }  // namespace
 
 int main()
@@ -269,6 +310,7 @@ int main()
   test_install_refuses_symlink_and_keeps_copy_private();
   test_install_checks_digest_on_roots_copy();
   test_reinstall_from_cache_keeps_the_deb();
+  test_timeout_kills_the_whole_process_group();
 
   const std::string rm = "rm -rf '" + g_root + "'";
   if (std::system(rm.c_str()) != 0)

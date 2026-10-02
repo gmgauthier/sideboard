@@ -1,3 +1,9 @@
+sideboard (0.3.9-1) unstable; urgency=medium
+
+  * An install timeout stops apt-get's children as well.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 02 Oct 2026 10:27:29 +0100
+
 sideboard (0.3.8-1) unstable; urgency=medium
 
   * Mark rows filled from the cache, and drop a release that now 404s.
