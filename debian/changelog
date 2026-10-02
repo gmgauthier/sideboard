@@ -1,3 +1,9 @@
+sideboard (0.3.2-1) unstable; urgency=medium
+
+  * Keep the running instance's socket when a second launch exits.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 02 Oct 2026 10:13:19 +0100
+
 sideboard (0.3.1-1) unstable; urgency=medium
 
   * Add a headless meson test suite and record known defects in BUG-BACKLOG.md.
