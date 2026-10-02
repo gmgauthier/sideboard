@@ -58,10 +58,12 @@ bool valid_deb_name(const char* name)
   return ends_with(name, "_amd64.deb");
 }
 
-/* Copies from an open descriptor into DEST, readable only by its owner. */
-bool copy_fd(int in, const char* dest)
+/* Copies from an open descriptor into DEST, readable only by its owner. The bytes go to a
+   new temporary file that replaces DEST only once complete, so DEST may be the source. */
+bool copy_fd(int in, const std::string& dest)
 {
-  const int out = ::open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
+  std::string tmpl = dest + ".XXXXXX";
+  const int out = ::mkostemp(&tmpl[0], O_CLOEXEC);
   if (out < 0)
     return false;
   bool ok = ::fchmod(out, 0600) == 0;
@@ -86,8 +88,10 @@ bool copy_fd(int in, const char* dest)
   }
   if (::close(out) != 0)
     ok = false;
+  if (ok && ::rename(tmpl.c_str(), dest.c_str()) != 0)
+    ok = false;
   if (!ok)
-    ::unlink(dest);
+    ::unlink(tmpl.c_str());
   return ok;
 }
 
@@ -333,7 +337,7 @@ Result install_deb(const char* src, const std::string& cache_dir, const AptRunne
   }
 
   const std::string dest = cache_dir + "/" + name;
-  const bool copied = copy_fd(in, dest.c_str());
+  const bool copied = copy_fd(in, dest);
   ::close(in);
   if (!copied)
     return fail("cannot copy into " + cache_dir);
