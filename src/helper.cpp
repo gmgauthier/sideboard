@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace {
 
@@ -30,14 +31,16 @@ int report(const sideboard::helper::Result& r)
 
 int main(int argc, char** argv)
 {
-  if (argc != 3)
-    die(2, "usage: sideboard-helper install /absolute/path.deb | remove package");
+  if (argc != 3 && argc != 4)
+    die(2, "usage: sideboard-helper install /absolute/path.deb [sha256:HEX] | remove package");
 
-  if (std::strcmp(argv[1], "remove") == 0)
+  if (std::strcmp(argv[1], "remove") == 0 && argc == 3)
     return report(sideboard::helper::remove_package(argv[2], sideboard::helper::run_apt));
 
   if (std::strcmp(argv[1], "install") != 0)
-    die(2, "usage: sideboard-helper install /absolute/path.deb | remove package");
+    die(2, "usage: sideboard-helper install /absolute/path.deb [sha256:HEX] | remove package");
 
-  return report(sideboard::helper::install_deb(argv[2], kCacheDir, sideboard::helper::run_apt));
+  const std::string digest = argc == 4 ? argv[3] : "";
+  return report(
+      sideboard::helper::install_deb(argv[2], kCacheDir, sideboard::helper::run_apt, digest));
 }

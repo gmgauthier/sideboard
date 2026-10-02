@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.3.4',
+  version: '0.3.5',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -106,5 +106,6 @@ helper_tests = executable(
   'src/helper_core.cpp',
   'src/catalog.cpp',
   include_directories: inc,
+  dependencies: [glib],
 )
 test('helper', helper_tests)

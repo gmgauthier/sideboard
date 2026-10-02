@@ -26,7 +26,8 @@ bool catalog_package(const char* pkg);
 std::string deb_package(const std::string& deb);
 std::string first_err_line(const std::string& blob);
 
-Result install_deb(const char* src, const std::string& cache_dir, const AptRunner& apt);
+Result install_deb(const char* src, const std::string& cache_dir, const AptRunner& apt,
+                   const std::string& digest = std::string());
 Result remove_package(const char* pkg, const AptRunner& apt);
 
 }  // namespace helper

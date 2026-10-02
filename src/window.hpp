@@ -44,7 +44,7 @@ class Window : public Gtk::Window {
   void stop_refresh();
   void size_to_list();
   void show_error(const Glib::ustring& msg);
-  bool pkexec_helper(const char* verb, const std::string& arg, std::string& error);
+  bool pkexec_helper(const std::vector<std::string>& argv, std::string& error);
 
   Gtk::Box root_{Gtk::ORIENTATION_VERTICAL, 0};
   Gtk::MenuBar menubar_;

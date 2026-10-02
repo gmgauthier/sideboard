@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### The hash the GUI checks is not the file root installs
-
-- Severity: security
-- Confidence: high
-- Where: `src/window.cpp:777`, `src/window.cpp:794`, `src/helper.cpp:252`
-- Trigger: Install or Upgrade a release that publishes a `sha256:` digest. While the authentication dialog is up, replace the deb in `~/.cache/sideboard/debs/`.
-- Outcome: The GUI hashes the user-writable cache file, then `pkexec` installs whatever is at that path when the helper starts. The helper does not take a digest and does not hash the file. `Gtk::Main::iteration()` runs between the check and `pkexec`, so the window is real. The copy into `/var/cache/sideboard` happens too late to stop the swap.
 
 ### Re-install from `/var/cache/sideboard` truncates the deb
 
@@ -47,6 +39,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### The hash the GUI checks is not the file root installs
+
+- Severity: security
+- Confidence: high
+- Where: `src/window.cpp` `on_download_done`, `src/helper_core.cpp` `install_deb`
+- Trigger: Install or Upgrade a release that publishes a `sha256:` digest. While the authentication dialog is up, replace the deb in `~/.cache/sideboard/debs/`.
+- Outcome: The GUI hashes the user-writable cache file, then `pkexec` installs whatever is at that path when the helper starts. The helper does not take a digest and does not hash the file. `Gtk::Main::iteration()` runs between the check and `pkexec`, so the window is real. The copy into `/var/cache/sideboard` happens too late to stop the swap.
+- Fixed in v0.3.5: The GUI passes the published `sha256:` digest to `sideboard-helper install`. The helper hashes its own root-owned copy and refuses the install, removing that copy, when the digest does not match. A swap in `~/.cache/sideboard/debs/` after the GUI's check is caught.
 
 ### Helper follows symlinks and leaves a world-readable copy
 

@@ -4,6 +4,7 @@
 #include "catalog.hpp"
 
 #include <fcntl.h>
+#include <glib.h>
 #include <poll.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -11,6 +12,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -100,6 +102,46 @@ bool private_dir(const std::string& dir)
   if ((st.st_mode & 07777) != 0700 && ::chmod(dir.c_str(), 0700) != 0)
     return false;
   return true;
+}
+
+/* "sha256:" plus 64 hex digits, returned lower-case without the prefix; empty if malformed. */
+std::string digest_hex(const std::string& digest)
+{
+  const std::string prefix = "sha256:";
+  if (digest.compare(0, prefix.size(), prefix) != 0 || digest.size() != prefix.size() + 64)
+    return {};
+  std::string hex = digest.substr(prefix.size());
+  for (auto& c : hex) {
+    if (!std::isxdigit(static_cast<unsigned char>(c)))
+      return {};
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return hex;
+}
+
+/* SHA-256 of PATH as lower-case hex, or empty on a read error. */
+std::string sha256_path(const std::string& path)
+{
+  const int fd = ::open(path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+  if (fd < 0)
+    return {};
+  GChecksum* sum = g_checksum_new(G_CHECKSUM_SHA256);
+  bool ok = true;
+  unsigned char buf[64 * 1024];
+  for (;;) {
+    const ssize_t n = ::read(fd, buf, sizeof(buf));
+    if (n < 0) {
+      ok = false;
+      break;
+    }
+    if (n == 0)
+      break;
+    g_checksum_update(sum, buf, n);
+  }
+  ::close(fd);
+  std::string hex = ok ? g_checksum_get_string(sum) : "";
+  g_checksum_free(sum);
+  return hex;
 }
 
 Result finish_apt(int rc, const std::string& output)
@@ -250,7 +292,8 @@ Result remove_package(const char* pkg, const AptRunner& apt)
   return finish_apt(apt("remove", pkg, output), output);
 }
 
-Result install_deb(const char* src, const std::string& cache_dir, const AptRunner& apt)
+Result install_deb(const char* src, const std::string& cache_dir, const AptRunner& apt,
+                   const std::string& digest)
 {
   if (!src || src[0] != '/')
     return refuse("path must be absolute");
@@ -262,6 +305,13 @@ Result install_deb(const char* src, const std::string& cache_dir, const AptRunne
   const char* name = base_name(src);
   if (!valid_deb_name(name))
     return refuse("refusing unexpected .deb name");
+
+  std::string want;
+  if (!digest.empty()) {
+    want = digest_hex(digest);
+    if (want.empty())
+      return refuse("digest must be sha256: and 64 hex digits");
+  }
 
   /* Never follow a symlink, and check the file that was actually opened. */
   const int in = ::open(src, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
@@ -293,6 +343,12 @@ Result install_deb(const char* src, const std::string& cache_dir, const AptRunne
   if (package.empty() || !catalog_package(package.c_str())) {
     ::unlink(dest.c_str());
     return refuse("package is not in the Sideboard catalog");
+  }
+
+  /* Check the published digest against root's copy, which the caller can no longer change. */
+  if (!want.empty() && sha256_path(dest) != want) {
+    ::unlink(dest.c_str());
+    return refuse("SHA-256 mismatch. The file was not installed.");
   }
 
   std::string output;
