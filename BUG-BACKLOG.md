@@ -2,19 +2,22 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), `tests/test_helper.cpp` (`helper`), `tests/test_fetch.cpp` (`fetch`), and `tests/test_refresh.cpp` (`refresh`). `refresh` folds a mixed Refresh into a cache and checks that a 404 drops the cached release, that a failed check is marked cached rather than live, and that a cached row's status carries `(cached)`. `fetch` points a download and a release check at a local server that stalls, sets the cancel flag, and checks that each returns within a few seconds and that the partial download is removed. `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), `tests/test_helper.cpp` (`helper`), `tests/test_fetch.cpp` (`fetch`), and `tests/test_refresh.cpp` (`refresh`). `refresh` folds a mixed Refresh into a cache and checks that a 404 drops the cached release, that a failed check is marked cached rather than live, and that a cached row's status carries `(cached)`. `fetch` points a download and a release check at a local server that stalls, sets the cancel flag, and checks that each returns within a few seconds and that the partial download is removed. `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, that a timeout kills the child's whole process group, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
+
+None.
+
+## Closed
 
 ### Install timeout does not kill apt's children
 
 - Severity: incorrect
 - Confidence: medium
-- Where: `src/helper.cpp:150`
+- Where: `src/helper_core.cpp` `run_capture`
 - Trigger: `apt-get install` of the copied deb is still running after five minutes (lock wait, a slow download, or a stuck unpack).
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
-
-## Closed
+- Fixed in v0.3.9: `apt-get` runs in its own process group with stdin on `/dev/null`. On the five-minute timeout the helper signals that whole group, so `dpkg` and apt's method children are stopped with it.
 
 ### A partial refresh shows stale cache as a live result
 

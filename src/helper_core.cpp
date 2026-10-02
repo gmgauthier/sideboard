@@ -199,6 +199,15 @@ int run_capture(const std::vector<std::string>& args, int timeout_sec, std::stri
     return -1;
   }
   if (pid == 0) {
+    /* Own process group, so a timeout reaches apt-get's dpkg and method children too. */
+    ::setpgid(0, 0);
+    /* Not the terminal's foreground group any more: a tty read would stop it with SIGTTIN. */
+    const int devnull = ::open("/dev/null", O_RDONLY);
+    if (devnull >= 0) {
+      ::dup2(devnull, STDIN_FILENO);
+      if (devnull != STDIN_FILENO)
+        ::close(devnull);
+    }
     ::close(pipefd[0]);
     ::dup2(pipefd[1], STDOUT_FILENO);
     ::dup2(pipefd[1], STDERR_FILENO);
@@ -215,14 +224,15 @@ int run_capture(const std::vector<std::string>& args, int timeout_sec, std::stri
     ::execv(argv[0], argv.data());
     ::_exit(127);
   }
+  ::setpgid(pid, pid);
   ::close(pipefd[1]);
   const time_t start = ::time(nullptr);
   char buf[4096];
   for (;;) {
     if (::time(nullptr) - start > timeout_sec) {
-      ::kill(pid, SIGTERM);
+      ::kill(-pid, SIGTERM);
       ::sleep(1);
-      ::kill(pid, SIGKILL);
+      ::kill(-pid, SIGKILL);
       ::close(pipefd[0]);
       int st = 0;
       ::waitpid(pid, &st, 0);
