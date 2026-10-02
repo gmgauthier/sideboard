@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "instance.hpp"
+
 #include <gtkmm.h>
 
 namespace sideboard {
@@ -26,8 +28,7 @@ class Application : public Gtk::Application {
   bool on_listen_io(Glib::IOCondition cond);
   void ensure_window();
 
-  int lock_fd_ = -1;
-  int listen_fd_ = -1;
+  InstanceGuard instance_;
   bool lock_ok_ = true;
   sigc::connection listen_conn_;
   Window* window_ = nullptr;

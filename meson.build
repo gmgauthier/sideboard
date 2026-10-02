@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.3.1',
+  version: '0.3.2',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -34,6 +34,7 @@ executable(
   'sideboard',
   'src/main.cpp',
   'src/application.cpp',
+  'src/instance.cpp',
   'src/window.cpp',
   'src/catalog.cpp',
   'src/local.cpp',
@@ -89,3 +90,11 @@ sideboard_tests = executable(
   dependencies: [gtkmm],
 )
 test('version', sideboard_tests)
+
+instance_tests = executable(
+  'sideboard-instance-tests',
+  'tests/test_instance.cpp',
+  'src/instance.cpp',
+  include_directories: inc,
+)
+test('instance', instance_tests)

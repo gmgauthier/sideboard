@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`). It checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`) and `tests/test_instance.cpp` (`instance`). `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### A second launch deletes the running instance's socket
-
-- Severity: incorrect
-- Confidence: high
-- Where: `src/application.cpp:61`, `src/application.cpp:110`
-- Trigger: Start Sideboard, then start it again.
-- Outcome: The second process fails the lock, `send_present()` succeeds, and `quit()` runs the destructor. `close_socket()` always `unlink`s `sideboard.sock`, even though this process never bound it (`listen_fd_` stays `-1`). The primary still holds `sideboard.lock`, but the socket is gone. A third start prints `sideboard: already running` and does not raise the window. That stays broken until the primary exits.
 
 ### Helper install is not limited to catalog packages
 
@@ -72,4 +64,11 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 
 ## Closed
 
-None.
+### A second launch deletes the running instance's socket
+
+- Severity: incorrect
+- Confidence: high
+- Where: `src/application.cpp` `close_socket`, `src/instance.cpp` `InstanceGuard::close`
+- Trigger: Start Sideboard, then start it again.
+- Outcome: The second process fails the lock, `send_present()` succeeds, and `quit()` runs the destructor. `close_socket()` always `unlink`s `sideboard.sock`, even though this process never bound it (`listen_fd_` stays `-1`). The primary still holds `sideboard.lock`, but the socket is gone. A third start prints `sideboard: already running` and does not raise the window. That stays broken until the primary exits.
+- Fixed in v0.3.2: Only the process that bound `sideboard.sock` removes it. A second launch raises the primary and exits without touching the socket, so a third launch still raises the window.
