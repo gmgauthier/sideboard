@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### Re-install from `/var/cache/sideboard` truncates the deb
-
-- Severity: data-loss
-- Confidence: medium
-- Where: `src/helper.cpp:59`
-- Trigger: `sideboard-helper install /var/cache/sideboard/foo_1_amd64.deb` (the copy a previous install left behind).
-- Outcome: Destination is that same path. `open` uses `O_TRUNC` before the read, so the file is emptied and `apt-get` fails. The cached copy is gone.
 
 ### Close or Quit blocks the UI thread for the rest of the transfer
 
@@ -39,6 +31,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### Re-install from `/var/cache/sideboard` truncates the deb
+
+- Severity: data-loss
+- Confidence: medium
+- Where: `src/helper_core.cpp` `copy_fd`
+- Trigger: `sideboard-helper install /var/cache/sideboard/foo_1_amd64.deb` (the copy a previous install left behind).
+- Outcome: Destination is that same path. `open` uses `O_TRUNC` before the read, so the file is emptied and `apt-get` fails. The cached copy is gone.
+- Fixed in v0.3.6: The helper copies into a new temporary file in `/var/cache/sideboard` and renames it over the destination only when the copy is complete, so installing the cached copy itself keeps the deb intact.
 
 ### The hash the GUI checks is not the file root installs
 

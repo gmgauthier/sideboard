@@ -1,3 +1,9 @@
+sideboard (0.3.6-1) unstable; urgency=medium
+
+  * Re-installing the helper's cached copy no longer empties it.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 02 Oct 2026 10:21:06 +0100
+
 sideboard (0.3.5-1) unstable; urgency=medium
 
   * The helper checks the published SHA-256 on its own copy.

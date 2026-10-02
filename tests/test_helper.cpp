@@ -220,6 +220,39 @@ void test_install_checks_digest_on_roots_copy()
   CHECK(bare.size() == 5 && bare[4] == "sha256:" + hex);
 }
 
+long size_of(const std::string& path)
+{
+  struct stat st;
+  if (::stat(path.c_str(), &st) != 0)
+    return -1;
+  return static_cast<long>(st.st_size);
+}
+
+void test_reinstall_from_cache_keeps_the_deb()
+{
+  const std::string cache = g_root + "/cache-reinstall";
+  const std::string good = make_deb("tally", "tally_1.0.3-1_amd64.deb");
+  const long size = size_of(good);
+  CHECK(size > 0);
+  FakeApt first;
+  CHECK(h::install_deb(good.c_str(), cache, first.runner()).code == 0);
+  const std::string cached = cache + "/tally_1.0.3-1_amd64.deb";
+  CHECK(size_of(cached) == size);
+
+  /* Installing the copy a previous install left behind must not empty it. */
+  long seen_size = -1;
+  FakeApt again;
+  h::AptRunner inspect = [&](const char* op, const std::string& arg, std::string& out) {
+    seen_size = size_of(arg);
+    return again.runner()(op, arg, out);
+  };
+  const h::Result r = h::install_deb(cached.c_str(), cache, inspect);
+  CHECK(r.code == 0);
+  CHECK(again.calls == 1);
+  CHECK(seen_size == size);
+  CHECK(size_of(cached) == size);
+}
+
 }  // namespace
 
 int main()
@@ -235,6 +268,7 @@ int main()
   test_remove_only_catalog_packages();
   test_install_refuses_symlink_and_keeps_copy_private();
   test_install_checks_digest_on_roots_copy();
+  test_reinstall_from_cache_keeps_the_deb();
 
   const std::string rm = "rm -rf '" + g_root + "'";
   if (std::system(rm.c_str()) != 0)
