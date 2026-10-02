@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.3.6',
+  version: '0.3.7',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -109,3 +109,13 @@ helper_tests = executable(
   dependencies: [glib],
 )
 test('helper', helper_tests)
+
+fetch_tests = executable(
+  'sideboard-fetch-tests',
+  'tests/test_fetch.cpp',
+  'src/fetch.cpp',
+  'src/remote.cpp',
+  include_directories: inc,
+  dependencies: [libcurl, libcrypto],
+)
+test('fetch', fetch_tests)

@@ -20,6 +20,7 @@ struct DlState {
   FILE* fp = nullptr;
   long written = 0;
   DownloadProgress progress;
+  const std::atomic<bool>* cancel = nullptr;
 };
 
 size_t file_write(char* ptr, size_t size, size_t nmemb, void* userdata)
@@ -36,6 +37,8 @@ size_t file_write(char* ptr, size_t size, size_t nmemb, void* userdata)
 int xfer(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, curl_off_t)
 {
   auto* st = static_cast<DlState*>(clientp);
+  if (st->cancel && st->cancel->load())
+    return 1; /* abort: Close or Quit is waiting on this thread */
   if (st->progress)
     st->progress(static_cast<long>(dlnow), static_cast<long>(dltotal));
   return 0;
@@ -56,7 +59,7 @@ std::string to_hex(const unsigned char* p, unsigned int n)
 }  // namespace
 
 bool download_file(const std::string& url, const std::string& dest, std::string& error,
-                   const DownloadProgress& progress)
+                   const DownloadProgress& progress, const std::atomic<bool>* cancel)
 {
   error.clear();
   FILE* fp = std::fopen(dest.c_str(), "wb");
@@ -73,6 +76,7 @@ bool download_file(const std::string& url, const std::string& dest, std::string&
   DlState st;
   st.fp = fp;
   st.progress = progress;
+  st.cancel = cancel;
   const std::string ua =
       std::string("sideboard/") + VERSION + " (+https://github.com/gmgauthier/sideboard)";
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -92,7 +96,7 @@ bool download_file(const std::string& url, const std::string& dest, std::string&
   curl_easy_cleanup(curl);
   std::fclose(fp);
   if (rc != CURLE_OK) {
-    error = curl_easy_strerror(rc);
+    error = (rc == CURLE_ABORTED_BY_CALLBACK) ? "Cancelled" : curl_easy_strerror(rc);
     std::remove(dest.c_str());
     return false;
   }

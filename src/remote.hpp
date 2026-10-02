@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <string>
 
 namespace sideboard {
@@ -20,8 +21,11 @@ struct Remote {
   long size = 0;
 };
 
-std::string http_get(const std::string& url, std::string& error);
-Remote fetch_latest(const char* owner, const char* repo, const char* package);
+/* CANCEL, when set by another thread, aborts the request. */
+std::string http_get(const std::string& url, std::string& error,
+                     const std::atomic<bool>* cancel = nullptr);
+Remote fetch_latest(const char* owner, const char* repo, const char* package,
+                    const std::atomic<bool>* cancel = nullptr);
 Remote parse_latest_release(const std::string& json, const char* package);
 
 }  // namespace sideboard
