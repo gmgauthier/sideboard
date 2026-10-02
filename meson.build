@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.3.7',
+  version: '0.3.8',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -43,6 +43,7 @@ executable(
   'src/remote.cpp',
   'src/compare.cpp',
   'src/cache.cpp',
+  'src/refresh.cpp',
   'src/fetch.cpp',
   include_directories: inc,
   dependencies: [gtkmm, libcurl, libcrypto],
@@ -119,3 +120,11 @@ fetch_tests = executable(
   dependencies: [libcurl, libcrypto],
 )
 test('fetch', fetch_tests)
+
+refresh_tests = executable(
+  'sideboard-refresh-tests',
+  'tests/test_refresh.cpp',
+  'src/refresh.cpp',
+  include_directories: inc,
+)
+test('refresh', refresh_tests)
