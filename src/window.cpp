@@ -10,6 +10,7 @@
 #include "helper_args.hpp"
 #include "local.hpp"
 #include "paths.hpp"
+#include "refresh.hpp"
 
 #include <glibmm.h>
 
@@ -176,20 +177,21 @@ class AppRow : public Gtk::ListBoxRow {
       return;
     }
     available_.set_text(remote_.upstream);
+    available_.set_tooltip_text(remote_.cached ? "From the last successful check" : "");
     if (!inst.present) {
-      status_.set_text("Not installed");
+      status_.set_text(row_status_text("Not installed", remote_.cached));
       action_.set_label("Install");
       action_.set_sensitive(!remote_.url.empty());
       return;
     }
     if (version_older(inst.debian, remote_.debian)) {
-      status_.set_text("Update available");
+      status_.set_text(row_status_text("Update available", remote_.cached));
       set_status_class(status_, "sideboard-status-update");
       action_.set_label("Upgrade");
       action_.set_sensitive(!remote_.url.empty());
       return;
     }
-    status_.set_text("Up to date");
+    status_.set_text(row_status_text("Up to date", remote_.cached));
     set_status_class(status_, "sideboard-status-ok");
     action_.set_label("—");
   }
@@ -549,31 +551,22 @@ void Window::on_refresh_done()
   cache.checked = now_stamp();
   std::size_t n = 0;
   const App* apps = catalog(&n);
-  int live_ok = 0;
-  for (std::size_t i = 0; i < rows_.size() && i < n; ++i) {
-    Remote rem = (i < results.size()) ? results[i] : Remote{};
-    if (rem.ok) {
-      rem.cached = false;
-      cache.apps[apps[i].package] = rem;
-      ++live_ok;
-    } else if (!rem.no_release) {
-      auto it = cache.apps.find(apps[i].package);
-      if (it != cache.apps.end()) {
-        rem = it->second;
-        rem.cached = true;
-        rem.ok = true;
-      }
-    }
+  std::vector<std::string> packages;
+  for (std::size_t i = 0; i < n; ++i)
+    packages.emplace_back(apps[i].package);
+  const RefreshMerge merged = merge_refresh(cache, packages, results);
+  for (std::size_t i = 0; i < rows_.size() && i < merged.rows.size(); ++i) {
+    const Remote& rem = merged.rows[i];
     const bool show = rem.ok || rem.no_release || !rem.error.empty();
     rows_[i]->apply(query_installed(apps[i].package), show ? &rem : nullptr);
   }
-  if (live_ok > 0) {
+  if (merged.any_live) {
     save_cache(cache);
     save_last_check(cache.checked);
     last_checked_.set_text("Last checked: " + cache.checked);
-    if (avail_head_)
-      avail_head_->set_text("Available");
   }
+  if (avail_head_ && (merged.any_live || merged.any_cached))
+    avail_head_->set_text(merged.any_cached ? "Available (cached)" : "Available");
   bool rate = false;
   for (const auto& rem : results) {
     if (rem.rate_limited) {

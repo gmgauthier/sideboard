@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), `tests/test_helper.cpp` (`helper`), and `tests/test_fetch.cpp` (`fetch`). `fetch` points a download and a release check at a local server that stalls, sets the cancel flag, and checks that each returns within a few seconds and that the partial download is removed. `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), `tests/test_helper.cpp` (`helper`), `tests/test_fetch.cpp` (`fetch`), and `tests/test_refresh.cpp` (`refresh`). `refresh` folds a mixed Refresh into a cache and checks that a 404 drops the cached release, that a failed check is marked cached rather than live, and that a cached row's status carries `(cached)`. `fetch` points a download and a release check at a local server that stalls, sets the cancel flag, and checks that each returns within a few seconds and that the partial download is removed. `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, that a published digest is checked against root's copy and a mismatch or malformed digest is refused, that the GUI passes that digest to the helper, that installing the copy a previous install left in the cache keeps it whole, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### A partial refresh shows stale cache as a live result
-
-- Severity: incorrect
-- Confidence: high
-- Where: `src/window.cpp:552`
-- Trigger: Refresh where at least one repo returns a release and another fails with anything except HTTP 404 (timeout, 5xx). Or a 404 for one repo while another succeeds.
-- Outcome: The failed row is filled from the old cache entry and marked `ok`. If any live result succeeded, the column header is set to `Available` and `save_cache` writes the cache back, including a 404's previous release. The next launch offers that release again. There is no per-row cached marker.
 
 ### Install timeout does not kill apt's children
 
@@ -23,6 +15,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### A partial refresh shows stale cache as a live result
+
+- Severity: incorrect
+- Confidence: high
+- Where: `src/window.cpp` `on_refresh_done`, `src/refresh.cpp` `merge_refresh`
+- Trigger: Refresh where at least one repo returns a release and another fails with anything except HTTP 404 (timeout, 5xx). Or a 404 for one repo while another succeeds.
+- Outcome: The failed row is filled from the old cache entry and marked `ok`. If any live result succeeded, the column header is set to `Available` and `save_cache` writes the cache back, including a 404's previous release. The next launch offers that release again. There is no per-row cached marker.
+- Fixed in v0.3.8: A repo that answers 404 drops its old release from the cache. A repo whose check fails shows its previous release with `(cached)` after the status, and the column header stays `Available (cached)` while any row is cached.
 
 ### Close or Quit blocks the UI thread for the rest of the transfer
 
