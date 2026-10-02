@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.3.2',
+  version: '0.3.3',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -53,6 +53,7 @@ executable(
 executable(
   'sideboard-helper',
   'src/helper.cpp',
+  'src/helper_core.cpp',
   'src/catalog.cpp',
   include_directories: inc,
   dependencies: [glib],
@@ -98,3 +99,12 @@ instance_tests = executable(
   include_directories: inc,
 )
 test('instance', instance_tests)
+
+helper_tests = executable(
+  'sideboard-helper-tests',
+  'tests/test_helper.cpp',
+  'src/helper_core.cpp',
+  'src/catalog.cpp',
+  include_directories: inc,
+)
+test('helper', helper_tests)
