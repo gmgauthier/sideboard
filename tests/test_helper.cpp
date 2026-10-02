@@ -89,6 +89,76 @@ void test_remove_only_catalog_packages()
   CHECK(apt.calls == 1);
 }
 
+mode_t mode_of(const std::string& path)
+{
+  struct stat st;
+  if (::lstat(path.c_str(), &st) != 0)
+    return 0;
+  return st.st_mode & 07777;
+}
+
+bool exists(const std::string& path)
+{
+  struct stat st;
+  return ::lstat(path.c_str(), &st) == 0;
+}
+
+void test_install_refuses_symlink_and_keeps_copy_private()
+{
+  const std::string cache = g_root + "/cache-private";
+
+  /* A symlink is refused and nothing is copied, even when it points at a catalog deb. */
+  const std::string secret = g_root + "/secret";
+  std::ofstream(secret) << "root:secret:hash\n";
+  const std::string link = g_root + "/x_1_amd64.deb";
+  CHECK(::symlink(secret.c_str(), link.c_str()) == 0);
+  FakeApt plain;
+  CHECK(h::install_deb(link.c_str(), cache, plain.runner()).code != 0);
+  CHECK(plain.calls == 0);
+  CHECK(!exists(cache + "/x_1_amd64.deb"));
+  const std::string target = make_deb("tally", "target.deb");
+  const std::string deb_link = g_root + "/tally_2.0.0-1_amd64.deb";
+  CHECK(::symlink(target.c_str(), deb_link.c_str()) == 0);
+  FakeApt apt;
+  h::Result r = h::install_deb(deb_link.c_str(), cache, apt.runner());
+  CHECK(r.code != 0);
+  CHECK(apt.calls == 0);
+  CHECK(!exists(cache + "/tally_2.0.0-1_amd64.deb"));
+
+  /* A real install: the cache directory and the copy are readable only by their owner. */
+  const std::string good = make_deb("tally", "tally_1.0.1-1_amd64.deb");
+  mode_t dir_mode = 0;
+  mode_t file_mode = 0;
+  FakeApt seen;
+  h::AptRunner inspect = [&](const char* op, const std::string& arg, std::string& out) {
+    dir_mode = mode_of(cache);
+    file_mode = mode_of(arg);
+    return seen.runner()(op, arg, out);
+  };
+  r = h::install_deb(good.c_str(), cache, inspect);
+  CHECK(r.code == 0);
+  CHECK(seen.calls == 1);
+  CHECK(dir_mode == 0700);
+  CHECK(file_mode == 0600);
+
+  /* A cache directory left 0755 by an older helper is tightened. */
+  const std::string old_cache = g_root + "/cache-old";
+  CHECK(::mkdir(old_cache.c_str(), 0755) == 0);
+  CHECK(::chmod(old_cache.c_str(), 0755) == 0);
+  FakeApt again;
+  r = h::install_deb(good.c_str(), old_cache, again.runner());
+  CHECK(r.code == 0);
+  CHECK(mode_of(old_cache) == 0700);
+
+  /* When apt-get fails, the copy is removed. */
+  FakeApt failing;
+  failing.rc = 100;
+  r = h::install_deb(good.c_str(), cache, failing.runner());
+  CHECK(r.code == 1);
+  CHECK(failing.calls == 1);
+  CHECK(!exists(failing.last_arg));
+}
+
 }  // namespace
 
 int main()
@@ -102,6 +172,7 @@ int main()
 
   test_install_only_catalog_packages();
   test_remove_only_catalog_packages();
+  test_install_refuses_symlink_and_keeps_copy_private();
 
   const std::string rm = "rm -rf '" + g_root + "'";
   if (std::system(rm.c_str()) != 0)

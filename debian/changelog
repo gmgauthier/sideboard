@@ -1,3 +1,9 @@
+sideboard (0.3.4-1) unstable; urgency=medium
+
+  * Refuse a symlinked deb and keep the helper's copy private.
+
+ -- Greg Gauthier <gmgauthier@protonmail.com>  Fri, 02 Oct 2026 10:17:34 +0100
+
 sideboard (0.3.3-1) unstable; urgency=medium
 
   * Install only a deb whose Package: field is in the catalog.

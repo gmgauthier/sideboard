@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, that a symlinked deb is refused, that the cache directory and copy are `0700` and `0600`, that the copy is removed when `apt-get` fails, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### Helper follows symlinks and leaves a world-readable copy
-
-- Severity: leak
-- Confidence: high
-- Where: `src/helper.cpp:62`, `src/helper.cpp:244`, `src/helper.cpp:252`
-- Trigger: `sideboard-helper install /tmp/x_1_amd64.deb` where that path is a symlink to a root-readable regular file (for example `/etc/shadow`) within the size limit.
-- Outcome: `stat` and `open` follow the symlink, so the regular-file check passes. The target bytes are written to `/var/cache/sideboard/x_1_amd64.deb` as mode `0644`. The directory is created `0755`. Nothing unlinks that copy if `apt-get` then fails. On a multi-user machine other users can read it.
 
 ### The hash the GUI checks is not the file root installs
 
@@ -55,6 +47,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### Helper follows symlinks and leaves a world-readable copy
+
+- Severity: leak
+- Confidence: high
+- Where: `src/helper_core.cpp` `install_deb`, `copy_fd`
+- Trigger: `sideboard-helper install /tmp/x_1_amd64.deb` where that path is a symlink to a root-readable regular file (for example `/etc/shadow`) within the size limit.
+- Outcome: `stat` and `open` follow the symlink, so the regular-file check passes. The target bytes are written to `/var/cache/sideboard/x_1_amd64.deb` as mode `0644`. The directory is created `0755`. Nothing unlinks that copy if `apt-get` then fails. On a multi-user machine other users can read it.
+- Fixed in v0.3.4: The deb is opened with `O_NOFOLLOW` and checked with `fstat` on that descriptor, so a symlink is refused. `/var/cache/sideboard` is created, or tightened, to `0700`, the copy is `0600`, and the copy is removed when `apt-get` fails.
 
 ### Helper install is not limited to catalog packages
 

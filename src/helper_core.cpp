@@ -56,23 +56,19 @@ bool valid_deb_name(const char* name)
   return ends_with(name, "_amd64.deb");
 }
 
-bool copy_file(const char* src, const char* dest)
+/* Copies from an open descriptor into DEST, readable only by its owner. */
+bool copy_fd(int in, const char* dest)
 {
-  const int in = ::open(src, O_RDONLY | O_CLOEXEC);
-  if (in < 0)
+  const int out = ::open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600);
+  if (out < 0)
     return false;
-  const int out = ::open(dest, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
-  if (out < 0) {
-    ::close(in);
-    return false;
-  }
+  bool ok = ::fchmod(out, 0600) == 0;
   char buf[64 * 1024];
-  for (;;) {
+  while (ok) {
     const ssize_t n = ::read(in, buf, sizeof(buf));
     if (n < 0) {
-      ::close(in);
-      ::close(out);
-      return false;
+      ok = false;
+      break;
     }
     if (n == 0)
       break;
@@ -80,15 +76,28 @@ bool copy_file(const char* src, const char* dest)
     while (off < n) {
       const ssize_t w = ::write(out, buf + off, static_cast<size_t>(n - off));
       if (w <= 0) {
-        ::close(in);
-        ::close(out);
-        return false;
+        ok = false;
+        break;
       }
       off += w;
     }
   }
-  ::close(in);
   if (::close(out) != 0)
+    ok = false;
+  if (!ok)
+    ::unlink(dest);
+  return ok;
+}
+
+/* Creates DIR as 0700, or tightens an existing real directory to 0700. */
+bool private_dir(const std::string& dir)
+{
+  if (::mkdir(dir.c_str(), 0700) != 0 && errno != EEXIST)
+    return false;
+  struct stat st;
+  if (::lstat(dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
+    return false;
+  if ((st.st_mode & 07777) != 0700 && ::chmod(dir.c_str(), 0700) != 0)
     return false;
   return true;
 }
@@ -254,17 +263,29 @@ Result install_deb(const char* src, const std::string& cache_dir, const AptRunne
   if (!valid_deb_name(name))
     return refuse("refusing unexpected .deb name");
 
-  struct stat st;
-  if (::stat(src, &st) != 0 || !S_ISREG(st.st_mode))
+  /* Never follow a symlink, and check the file that was actually opened. */
+  const int in = ::open(src, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
+  if (in < 0)
     return refuse("not a regular file");
-  if (st.st_size <= 0 || st.st_size > kMaxDeb)
+  struct stat st;
+  if (::fstat(in, &st) != 0 || !S_ISREG(st.st_mode)) {
+    ::close(in);
+    return refuse("not a regular file");
+  }
+  if (st.st_size <= 0 || st.st_size > kMaxDeb) {
+    ::close(in);
     return refuse("file too large");
+  }
 
-  if (::mkdir(cache_dir.c_str(), 0755) != 0 && errno != EEXIST)
+  if (!private_dir(cache_dir)) {
+    ::close(in);
     return fail("cannot create " + cache_dir);
+  }
 
   const std::string dest = cache_dir + "/" + name;
-  if (!copy_file(src, dest.c_str()))
+  const bool copied = copy_fd(in, dest.c_str());
+  ::close(in);
+  if (!copied)
     return fail("cannot copy into " + cache_dir);
 
   /* Read the package name from root's copy, not from the file name the caller chose. */
@@ -275,7 +296,10 @@ Result install_deb(const char* src, const std::string& cache_dir, const AptRunne
   }
 
   std::string output;
-  return finish_apt(apt("install", dest, output), output);
+  const int rc = apt("install", dest, output);
+  if (rc != 0)
+    ::unlink(dest.c_str());
+  return finish_apt(rc, output);
 }
 
 }  // namespace helper
