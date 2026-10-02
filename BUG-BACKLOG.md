@@ -2,17 +2,9 @@
 
 Reviewed 2026-10-01 against the 0.3.0 sources.
 
-`meson test` runs `tests/test_version.cpp` (`version`) and `tests/test_instance.cpp` (`instance`). `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
+`meson test` runs `tests/test_version.cpp` (`version`), `tests/test_instance.cpp` (`instance`), and `tests/test_helper.cpp` (`helper`). `helper` builds small debs with `dpkg-deb` and runs the helper's install and remove logic against a fake `apt-get`. It checks that install refuses a deb whose `Package:` field is not in the catalog, whatever the file is called, and that remove refuses a package outside the catalog. `instance` checks that a second launch raises the primary and leaves its socket in place, so a third launch can still raise it. `version` checks `version_older`, `display_upstream`, and the compiled-in catalog (11 apps, including Listen-O-Matic). It does not install packages. `query_installed` passes a `dpkg-query` argv through `Glib::spawn_command_line_sync`; catalog package names are plain identifiers, and that call is not a shell injection.
 
 ## Open
-
-### Helper install is not limited to catalog packages
-
-- Severity: security
-- Confidence: high
-- Where: `src/helper.cpp:221`, `src/helper.cpp:239`
-- Trigger: After one authenticated Sideboard install, another process in the session runs `sideboard-helper install` on any absolute `*_amd64.deb` during the polkit keep window. `data/org.gmgauthier.sideboard.policy` is `auth_admin_keep` for the active session, pinned to the helper binary and not to its arguments.
-- Outcome: `remove` checks the catalog. `install` only checks that the basename does not start with `.`, contains no `/` or `..`, and ends with `_amd64.deb`. It never reads the deb's `Package:` field. Root runs that deb's maintainer scripts.
 
 ### Helper follows symlinks and leaves a world-readable copy
 
@@ -63,6 +55,15 @@ Reviewed 2026-10-01 against the 0.3.0 sources.
 - Outcome: The helper `kill`s only the `apt-get` pid. The child is not in its own process group, so `dpkg` and apt method children are not signaled. The GUI reports failure, but a child `dpkg` can keep installing as root or can be left holding the dpkg lock.
 
 ## Closed
+
+### Helper install is not limited to catalog packages
+
+- Severity: security
+- Confidence: high
+- Where: `src/helper_core.cpp` `install_deb`
+- Trigger: After one authenticated Sideboard install, another process in the session runs `sideboard-helper install` on any absolute `*_amd64.deb` during the polkit keep window. `data/org.gmgauthier.sideboard.policy` is `auth_admin_keep` for the active session, pinned to the helper binary and not to its arguments.
+- Outcome: `remove` checks the catalog. `install` only checks that the basename does not start with `.`, contains no `/` or `..`, and ends with `_amd64.deb`. It never reads the deb's `Package:` field. Root runs that deb's maintainer scripts.
+- Fixed in v0.3.3: The helper reads the `Package:` field of its own copy with `dpkg-deb` and installs only a catalog package. A deb whose field is not in the catalog, or that `dpkg-deb` cannot read, is refused and its copy removed.
 
 ### A second launch deletes the running instance's socket
 
