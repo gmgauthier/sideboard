@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "catalog.hpp"
 #include "remote.hpp"
 
 #include <gtkmm.h>
@@ -69,6 +70,9 @@ class Window : public Gtk::Window {
   std::thread refresh_thread_;
   std::mutex mu_;
   std::vector<Remote> refresh_result_;
+  std::vector<App> refresh_apps_;
+  std::vector<SlateGuest> refresh_slate_;
+  bool refresh_replaced_ = false;
   std::string progress_text_;
   double progress_frac_ = 0;
   std::string refresh_banner_;

@@ -27,29 +27,13 @@ int main()
   CHECK(sideboard::display_upstream("1.0-1ubuntu1") == "1.0");
   CHECK(sideboard::display_upstream("") == "");
 
-  std::size_t count = 0;
-  const sideboard::App* apps = sideboard::catalog(&count);
-  CHECK(apps != nullptr);
-  CHECK(count == 12);
-  bool saw_listen = false;
-  bool saw_write = false;
-  for (std::size_t i = 0; i < count; ++i) {
-    CHECK(apps[i].package != nullptr);
-    CHECK(apps[i].package[0] != '\0');
-    if (std::string(apps[i].id) == "listenomatic") {
-      saw_listen = true;
-      CHECK(std::string(apps[i].package) == "listenomatic");
-      CHECK(std::string(apps[i].repo) == "listenomatic");
-    }
-    if (std::string(apps[i].id) == "write-it") {
-      saw_write = true;
-      CHECK(std::string(apps[i].display) == "Write-It");
-      CHECK(std::string(apps[i].package) == "write-it");
-      CHECK(std::string(apps[i].repo) == "write-it");
-    }
-  }
-  CHECK(saw_listen);
-  CHECK(saw_write);
+  const std::vector<sideboard::App>& apps = sideboard::catalog();
+  CHECK(apps.size() == 1);
+  CHECK(apps[0].package == "sideboard");
+  CHECK(sideboard::package_name_ok("write-it"));
+  CHECK(!sideboard::package_name_ok("Write-It"));
+  CHECK(!sideboard::package_name_ok("../evil"));
+  CHECK(!sideboard::package_name_ok(""));
 
   return suite_test::done("version");
 }

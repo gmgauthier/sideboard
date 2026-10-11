@@ -146,7 +146,8 @@ int cancel_xfer(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t)
 
 }  // namespace
 
-std::string http_get(const std::string& url, std::string& error, const std::atomic<bool>* cancel)
+std::string http_get(const std::string& url, std::string& error, const std::atomic<bool>* cancel,
+                     bool follow, const char* accept)
 {
   error.clear();
   if (cancel && cancel->load()) {
@@ -162,13 +163,17 @@ std::string http_get(const std::string& url, std::string& error, const std::atom
   const std::string ua =
       std::string("sideboard/") + VERSION + " (+https://github.com/gmgauthier/sideboard)";
   struct curl_slist* headers = nullptr;
-  headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
+  std::string accept_header;
+  if (accept && accept[0]) {
+    accept_header = std::string("Accept: ") + accept;
+    headers = curl_slist_append(headers, accept_header.c_str());
+  }
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
   curl_easy_setopt(curl, CURLOPT_USERAGENT, ua.c_str());
   curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write);
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, follow ? 1L : 0L);
   curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
   curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https,http");
   if (cancel) {

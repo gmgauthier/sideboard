@@ -59,6 +59,12 @@ Acceptable alternates if Sideboard is taken: Cupboard, The Rack. Do not bikeshed
 
 ## 4. The catalog (allow-list)
 
+A public repository owned by `gmgauthier` is a guest when it carries the GitHub topic `lcos-guest`, `sideboard.ini` in the default branch has a `display=` line, and the latest release contains `{repo}_*_amd64.deb`. Sideboard itself is always the last row and does not carry the topic, so the cabinet can still upgrade itself. Count-It and Show-It stay hidden until they publish a `.deb`.
+
+Adding a guest is the topic, that one-line file, and a release `.deb`. It does not take a new Sideboard release.
+
+The table below is the compiled-in inventory from 2026-09-18. Versions move; the pattern does not. Membership is the topic now.
+
 All under `https://github.com/gmgauthier`. All Unlicense. All gtkmm-3 / Meson. All ship a release `.deb` named:
 
 ```
@@ -107,9 +113,11 @@ Architecture: every published `.deb` is `amd64`. If `dpkg --print-architecture` 
 
 ---
 
-## 5. Catalog (compiled in)
+## 5. Catalog
 
-One table in source. Adding an eighth app is a row plus a rebuild, not a protocol and not a URL the user types.
+Refresh reads `GET /users/gmgauthier/repos`, keeps repositories tagged `lcos-guest` that are not forks, and skips `sideboard`. For each one it reads `sideboard.ini` (`display=Write-It`) from the default branch and the latest release. The helper allows `sideboard` outright. Every other package name has to pass the same topic check, which the helper performs itself against `api.github.com`, with redirects off. The last successful guest list is cached so the window can open offline. A failed list leaves that cache in place.
+
+Adding an app is not a URL the user types.
 
 ```cpp
 struct App {
@@ -126,7 +134,7 @@ v1 rows: the seven above, in that order (suite chronology / screenshot value).
 
 v1.1: add Sideboard itself as row eight so the cabinet can update itself. Do **not** put Sideboard in the catalog until it has shipped its own `.deb` (milestone M4). Apt can replace a running binary the usual way; do not invent a fancy self-update dance.
 
-No remote `catalog.json` in v1. Revisit only if adding apps without a rebuild becomes a real pain.
+There is no remote `catalog.json`. The topic on each repository is the list.
 
 ---
 
@@ -411,7 +419,7 @@ After M4, adding Sideboard as catalog row eight is a point release.
 - Release-notes pane
 - AppImage install path
 - Auto-check on login
-- Remote catalog
+- Remote catalog (shipped in 0.5.0 as the `lcos-guest` topic)
 - Any architecture other than amd64
 - GitHub authentication
 - “Install missing” as a separate verb
@@ -466,7 +474,7 @@ After M4, adding Sideboard as catalog row eight is a point release.
 | Helper verbs | simulate, upgrade | install one local `.deb` |
 | `apt-get update` | yes | no |
 | `apt-get upgrade` | yes | no |
-| Catalog | whatever apt knows | seven compiled-in rows |
+| Catalog | whatever apt knows | repos tagged `lcos-guest`, plus Sideboard |
 | Menu | official System | official System, different name and icon |
 
 Do not share a polkit action. Do not shell out to `lcos-updates-helper`.
@@ -475,7 +483,7 @@ Do not share a polkit action. Do not shell out to `lcos-updates-helper`.
 
 ## 15. First README paragraph (use this tone)
 
-Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris, Partyline, Dispatch, Needle, Tally, Listen-O-Matic, Write-It, and itself; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
+Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists the public repositories under github.com/gmgauthier tagged `lcos-guest` that publish an amd64 `.deb`, and itself; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
 
 ---
 
