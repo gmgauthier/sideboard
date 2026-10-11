@@ -23,6 +23,8 @@ const App kApps[] = {
     {"tally", "Tally", "tally", "gmgauthier", "tally", "HyperCam-shaped screen recorder for LCOS."},
     {"listenomatic", "Listen-O-Matic", "listenomatic", "gmgauthier", "listenomatic",
      "Kitchen radio for LCOS: live streams and podcast shows."},
+    {"write-it", "Write-It", "write-it", "gmgauthier", "write-it",
+     "Word processor in the Word 97 shape."},
     {"sideboard", "Sideboard", "sideboard", "gmgauthier", "sideboard",
      "Guest-suite cabinet for LCOS. Not an official LCOS updater."},
 };

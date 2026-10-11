@@ -79,6 +79,7 @@ Inventory as of 2026-09-18. Versions move; the *pattern* does not.
 | Needle | `needle` | `gmgauthier/needle` | v0.1.0 | `needle_0.1.0-1_amd64.deb` |
 | Tally | `tally` | `gmgauthier/tally` | v0.1.0 | `tally_0.1.0-1_amd64.deb` |
 | Listen-O-Matic | `listenomatic` | `gmgauthier/listenomatic` | v1.0.0 | `listenomatic_1.0.0-1_amd64.deb` |
+| Write-It | `write-it` | `gmgauthier/write-it` | v1.0.8 | `write-it_1.0.8-1_amd64.deb` |
 
 Each release also publishes an AppImage and a `.tar.xz`. **Sideboard ignores those.** Preferred install on LCOS is the `.deb`, same as every suite README:
 
@@ -474,7 +475,7 @@ Do not share a polkit action. Do not shell out to `lcos-updates-helper`.
 
 ## 15. First README paragraph (use this tone)
 
-Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris, Partyline, Dispatch, Needle, Tally, Listen-O-Matic, and itself; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
+Sideboard is a cabinet for the guest applications written for The Lunduke Computer Operating System. It is not an official LCOS updater and it is not a store. It lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris, Partyline, Dispatch, Needle, Tally, Listen-O-Matic, Write-It, and itself; shows the version `dpkg` has versus the version on GitHub Releases; and installs the published `.deb`.
 
 ---
 
