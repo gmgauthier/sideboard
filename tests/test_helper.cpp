@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Unlicense */
 
 #include "helper_core.hpp"
+#include "discover.hpp"
 #include "helper_args.hpp"
 #include "check.hpp"
 
@@ -304,6 +305,11 @@ int main()
   if (!dir)
     return suite_test::done("helper");
   g_root = dir;
+  sideboard::set_topic_probe([](const std::string& pkg) { return pkg == "tally"; });
+  CHECK(h::catalog_package("sideboard"));
+  CHECK(h::catalog_package("tally"));
+  CHECK(!h::catalog_package("evil"));
+  CHECK(!h::catalog_package("../evil"));
 
   test_install_only_catalog_packages();
   test_remove_only_catalog_packages();

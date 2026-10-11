@@ -2,40 +2,78 @@
 
 #include "catalog.hpp"
 
+#include <cctype>
+
 namespace sideboard {
 namespace {
 
-const App kApps[] = {
-    {"earblaster", "EarBlaster", "earblaster", "gmgauthier", "earblaster",
-     "Audio player in the Windows Media Player 7 shape."},
-    {"readomatic", "Read-O-Matic", "readomatic", "gmgauthier", "readomatic",
-     "EPUB reader in the WinHelp 4 / OS/2 VIEW.EXE shape."},
-    {"yolodex", "YOLO-dex", "yolodex", "gmgauthier", "yolodex",
-     "Address book in the Windows Cardfile shape."},
-    {"kablamo", "Kablamo!", "kablamo", "gmgauthier", "kablamo",
-     "Minesweeper for The Lunduke Computer Operating System."},
-    {"ephemeris", "Ephemeris", "ephemeris", "gmgauthier", "ephemeris",
-     "Calendar and day pages for LCOS."},
-    {"partyline", "Partyline", "partyline", "gmgauthier", "partyline", "IRC client for LCOS."},
-    {"dispatch", "Dispatch", "dispatch", "gmgauthier", "dispatch", "RSS/Atom reader for LCOS."},
-    {"needle", "Needle", "needle", "gmgauthier", "needle",
-     "Sound Recorder in the Windows 95 sndrec32 shape."},
-    {"tally", "Tally", "tally", "gmgauthier", "tally", "HyperCam-shaped screen recorder for LCOS."},
-    {"listenomatic", "Listen-O-Matic", "listenomatic", "gmgauthier", "listenomatic",
-     "Kitchen radio for LCOS: live streams and podcast shows."},
-    {"write-it", "Write-It", "write-it", "gmgauthier", "write-it",
-     "Word processor in the Word 97 shape."},
-    {"sideboard", "Sideboard", "sideboard", "gmgauthier", "sideboard",
-     "Guest-suite cabinet for LCOS. Not an official LCOS updater."},
-};
+std::vector<App>& apps()
+{
+  static std::vector<App> rows{sideboard_app()};
+  return rows;
+}
 
 }  // namespace
 
-const App* catalog(std::size_t* count)
+bool package_name_ok(const std::string& name)
 {
-  if (count)
-    *count = sizeof(kApps) / sizeof(kApps[0]);
-  return kApps;
+  if (name.empty() || name.size() > 64)
+    return false;
+  const unsigned char first = static_cast<unsigned char>(name[0]);
+  if (!std::islower(first) && !std::isdigit(first))
+    return false;
+  for (char c : name) {
+    const unsigned char u = static_cast<unsigned char>(c);
+    if (!std::islower(u) && !std::isdigit(u) && c != '-')
+      return false;
+  }
+  return true;
+}
+
+App sideboard_app()
+{
+  App app;
+  app.id = "sideboard";
+  app.display = "Sideboard";
+  app.package = "sideboard";
+  app.owner = "gmgauthier";
+  app.repo = "sideboard";
+  app.summary = "Guest-suite cabinet for LCOS. Not an official LCOS updater.";
+  return app;
+}
+
+const std::vector<App>& catalog()
+{
+  return apps();
+}
+
+void set_catalog(std::vector<App> guests)
+{
+  std::vector<App> rows;
+  for (auto& app : guests) {
+    if (!package_name_ok(app.package) || app.package == "sideboard" || app.display.empty())
+      continue;
+    app.id = app.package;
+    app.owner = "gmgauthier";
+    app.repo = app.package;
+    rows.push_back(std::move(app));
+  }
+  rows.push_back(sideboard_app());
+  apps() = std::move(rows);
+}
+
+std::vector<App> apps_from_slate(const std::vector<SlateGuest>& slate)
+{
+  std::vector<App> guests;
+  guests.reserve(slate.size());
+  for (const SlateGuest& guest : slate) {
+    App app;
+    app.package = guest.package;
+    app.display = guest.display;
+    app.summary = guest.summary;
+    guests.push_back(std::move(app));
+  }
+  return guests;
 }
 
 }  // namespace sideboard

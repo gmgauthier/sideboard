@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Unlicense */
 
 #include "helper_core.hpp"
-#include "catalog.hpp"
+#include "discover.hpp"
 
 #include <fcntl.h>
 #include <glib.h>
@@ -289,13 +289,7 @@ std::string deb_package(const std::string& deb)
 
 bool catalog_package(const char* pkg)
 {
-  std::size_t n = 0;
-  const App* apps = catalog(&n);
-  for (std::size_t i = 0; i < n; ++i) {
-    if (std::strcmp(apps[i].package, pkg) == 0)
-      return true;
-  }
-  return false;
+  return allowed_package(pkg);
 }
 
 Result remove_package(const char* pkg, const AptRunner& apt)

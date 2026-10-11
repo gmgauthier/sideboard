@@ -33,13 +33,13 @@ AboutDialog::AboutDialog(Gtk::Window& parent)
   guest->set_max_width_chars(56);
   box->pack_start(*guest, Gtk::PACK_SHRINK);
 
-  std::size_t n = 0;
-  const App* apps = catalog(&n);
   std::string names;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (i)
+  bool first = true;
+  for (const App& app : catalog()) {
+    if (!first)
       names += ", ";
-    names += apps[i].display;
+    first = false;
+    names += app.display;
   }
   auto* list = Gtk::manage(new Gtk::Label("Guest apps: " + names + "."));
   list->set_line_wrap(true);

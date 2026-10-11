@@ -151,7 +151,18 @@ void save_cache(const CatalogCache& cache)
     os << "      \"size\": " << r.size << "\n";
     os << "    }";
   }
-  os << "\n  }\n}\n";
+  os << "\n  },\n  \"guests\": [\n";
+  bool first_guest = true;
+  for (const SlateGuest& guest : cache.slate) {
+    if (!first_guest)
+      os << ",\n";
+    first_guest = false;
+    os << "    {\"package\": \"" << json_escape(guest.package) << "\", ";
+    os << "\"display\": \"" << json_escape(guest.display) << "\", ";
+    os << "\"summary\": \"" << json_escape(guest.summary) << "\", ";
+    os << "\"created\": \"" << json_escape(guest.created) << "\"}";
+  }
+  os << "\n  ]\n}\n";
   std::ofstream out(cache_path());
   if (!out)
     return;
@@ -216,6 +227,41 @@ CatalogCache load_cache()
     if (!pkg.empty() && !r.upstream.empty())
       c.apps[pkg] = r;
     i = obj_end + 1;
+  }
+  const auto guests_at = json.find("\"guests\"", i);
+  if (guests_at == std::string::npos)
+    return c;
+  const auto list_at = json.find('[', guests_at);
+  if (list_at == std::string::npos)
+    return c;
+  std::size_t g = list_at + 1;
+  while (g < json.size()) {
+    while (g < json.size() && json[g] != '{' && json[g] != ']')
+      ++g;
+    if (g >= json.size() || json[g] == ']')
+      break;
+    int depth = 0;
+    std::size_t end = g;
+    for (; end < json.size(); ++end) {
+      if (json[end] == '{')
+        ++depth;
+      else if (json[end] == '}') {
+        --depth;
+        if (depth == 0)
+          break;
+      }
+    }
+    if (end >= json.size())
+      break;
+    const std::string obj = json.substr(g, end - g + 1);
+    SlateGuest guest;
+    guest.package = json_string_field(obj, "package");
+    guest.display = json_string_field(obj, "display");
+    guest.summary = json_string_field(obj, "summary");
+    guest.created = json_string_field(obj, "created");
+    if (!guest.package.empty() && !guest.display.empty())
+      c.slate.push_back(guest);
+    g = end + 1;
   }
   return c;
 }

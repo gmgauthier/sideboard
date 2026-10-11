@@ -1,7 +1,7 @@
 project(
   'sideboard',
   'cpp',
-  version: '0.4.0',
+  version: '0.5.0',
   license: 'Unlicense',
   meson_version: '>=0.56',
   default_options: [
@@ -45,6 +45,7 @@ executable(
   'src/cache.cpp',
   'src/refresh.cpp',
   'src/fetch.cpp',
+  'src/discover.cpp',
   include_directories: inc,
   dependencies: [gtkmm, libcurl, libcrypto],
   install: true,
@@ -56,8 +57,10 @@ executable(
   'src/helper.cpp',
   'src/helper_core.cpp',
   'src/catalog.cpp',
+  'src/discover.cpp',
+  'src/remote.cpp',
   include_directories: inc,
-  dependencies: [glib],
+  dependencies: [glib, libcurl],
   install: true,
   install_dir: get_option('libexecdir'),
 )
@@ -106,8 +109,10 @@ helper_tests = executable(
   'tests/test_helper.cpp',
   'src/helper_core.cpp',
   'src/catalog.cpp',
+  'src/discover.cpp',
+  'src/remote.cpp',
   include_directories: inc,
-  dependencies: [glib],
+  dependencies: [glib, libcurl],
 )
 test('helper', helper_tests)
 
@@ -128,3 +133,14 @@ refresh_tests = executable(
   include_directories: inc,
 )
 test('refresh', refresh_tests)
+
+discover_tests = executable(
+  'sideboard-discover-tests',
+  'tests/test_discover.cpp',
+  'src/discover.cpp',
+  'src/remote.cpp',
+  'src/catalog.cpp',
+  include_directories: inc,
+  dependencies: [libcurl],
+)
+test('discover', discover_tests)

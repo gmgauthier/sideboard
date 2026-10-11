@@ -25,7 +25,7 @@ Depends:
  pkexec,
  apt
 Description: Guest-suite cabinet for The Lunduke Computer Operating System
- Sideboard lists EarBlaster, Read-O-Matic, YOLO-dex, Kablamo!, Ephemeris,
- Partyline, Dispatch, Needle, Tally, Listen-O-Matic, Write-It, and itself.
- It compares dpkg versions to GitHub Releases and installs the published
- .deb. It is not an official LCOS updater.
+ Sideboard lists the public gmgauthier repositories tagged lcos-guest
+ that publish an amd64 .deb, and itself. It compares dpkg versions to
+ GitHub Releases and installs the published .deb. It is not an official
+ LCOS updater.

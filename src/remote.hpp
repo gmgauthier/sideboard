@@ -21,9 +21,12 @@ struct Remote {
   long size = 0;
 };
 
-/* CANCEL, when set by another thread, aborts the request. */
+/* CANCEL, when set by another thread, aborts the request.
+   FOLLOW is off for the helper's topic check so a redirect cannot change the host.
+   ACCEPT null omits the header. */
 std::string http_get(const std::string& url, std::string& error,
-                     const std::atomic<bool>* cancel = nullptr);
+                     const std::atomic<bool>* cancel = nullptr, bool follow = true,
+                     const char* accept = "application/vnd.github+json");
 Remote fetch_latest(const char* owner, const char* repo, const char* package,
                     const std::atomic<bool>* cancel = nullptr);
 Remote parse_latest_release(const std::string& json, const char* package);

@@ -5,6 +5,7 @@
 #include "cache.hpp"
 #include "catalog.hpp"
 #include "compare.hpp"
+#include "discover.hpp"
 #include "config.hpp"
 #include "fetch.hpp"
 #include "helper_args.hpp"
@@ -94,18 +95,18 @@ class AppRow : public Gtk::ListBoxRow {
     box_.pack_start(action_, Gtk::PACK_SHRINK);
     box_.pack_start(remove_, Gtk::PACK_SHRINK);
     add(box_);
-    apply(query_installed(app.package), nullptr);
+    apply(query_installed(app.package.c_str()), nullptr);
     show_all();
   }
 
   const char* package() const
   {
-    return package_;
+    return package_.c_str();
   }
 
   const char* display() const
   {
-    return display_;
+    return display_.c_str();
   }
 
   const Remote& remote() const
@@ -117,7 +118,7 @@ class AppRow : public Gtk::ListBoxRow {
   {
     if (!remote_.ok || remote_.url.empty())
       return false;
-    const Installed inst = query_installed(package_);
+    const Installed inst = query_installed(package_.c_str());
     return inst.present && version_older(inst.debian, remote_.debian);
   }
 
@@ -141,7 +142,7 @@ class AppRow : public Gtk::ListBoxRow {
     installed_.set_text(inst.present ? Glib::ustring(inst.upstream) : Glib::ustring("—"));
     set_status_class(status_, nullptr);
     action_.set_sensitive(false);
-    const bool self = package_ && std::strcmp(package_, "sideboard") == 0;
+    const bool self = package_ == "sideboard";
     remove_.set_sensitive(inst.present && !self);
 
     if (remote_.no_release) {
@@ -226,13 +227,14 @@ class AppRow : public Gtk::ListBoxRow {
       action_.set_sensitive(false);
       remove_.set_sensitive(false);
     } else {
-      apply(query_installed(package_), remote_.ok || !remote_.url.empty() ? &remote_ : nullptr);
+      apply(query_installed(package_.c_str()),
+            remote_.ok || !remote_.url.empty() ? &remote_ : nullptr);
     }
   }
 
  private:
-  const char* package_ = nullptr;
-  const char* display_ = nullptr;
+  std::string package_;
+  std::string display_;
   Remote remote_;
   sigc::signal<void> signal_install_;
   sigc::signal<void> signal_remove_;
@@ -258,11 +260,17 @@ Window::Window()
   build_menu();
   build_body();
   add(root_);
+  {
+    const CatalogCache opening = load_cache();
+    if (!opening.slate.empty())
+      set_catalog(apps_from_slate(opening.slate));
+  }
   fill_rows();
   apply_cache();
   show_all();
   progress_.hide();
   size_to_list();
+  on_refresh();
 }
 
 Window::~Window()
@@ -385,10 +393,8 @@ void Window::fill_rows()
     list_.remove(*w);
   rows_.clear();
 
-  std::size_t n = 0;
-  const App* apps = catalog(&n);
-  for (std::size_t i = 0; i < n; ++i) {
-    auto* row = Gtk::manage(new AppRow(apps[i]));
+  for (const App& app : catalog()) {
+    auto* row = Gtk::manage(new AppRow(app));
     row->signal_install().connect([this, row]() { on_install(row); });
     row->signal_remove().connect([this, row]() { on_uninstall(row); });
     list_.append(*row);
@@ -475,42 +481,96 @@ void Window::on_refresh()
 
 void Window::run_refresh()
 {
-  std::size_t n = 0;
-  const App* apps = catalog(&n);
-  std::vector<Remote> results(n);
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    progress_text_ = "Reading the guest list…";
+    progress_frac_ = 0;
+  }
+  progress_dispatch_.emit();
+
+  const DiscoverResult found = discover_guests(&cancel_);
+  std::vector<App> apps;
+  std::vector<Remote> results;
+  std::vector<SlateGuest> slate;
+  bool replaced = false;
+  if (found.ok && !cancel_) {
+    replaced = true;
+    for (const DiscoveredGuest& guest : found.guests) {
+      apps.push_back(guest.app);
+      results.push_back(guest.remote);
+      SlateGuest row;
+      row.package = guest.app.package;
+      row.display = guest.app.display;
+      row.summary = guest.app.summary;
+      row.created = guest.created;
+      slate.push_back(std::move(row));
+    }
+    apps.push_back(sideboard_app());
+    results.push_back(fetch_latest("gmgauthier", "sideboard", "sideboard", &cancel_));
+  } else if (found.rate_limited) {
+    apps = catalog();
+    results.assign(apps.size(), Remote{});
+    if (!results.empty()) {
+      results[0].rate_limited = true;
+      results[0].error = found.error;
+    }
+  } else {
+    apps = catalog();
+  }
+
   int failed = 0;
-  std::string banner;
-  for (std::size_t i = 0; i < n; ++i) {
-    if (cancel_)
-      break;
-    {
-      std::lock_guard<std::mutex> lock(mu_);
-      progress_text_ = std::string("Checking ") + apps[i].display + "…";
-      progress_frac_ = (n == 0) ? 0 : static_cast<double>(i) / static_cast<double>(n);
-    }
-    progress_dispatch_.emit();
-    results[i] = fetch_latest(apps[i].owner, apps[i].repo, apps[i].package, &cancel_);
-    if (results[i].rate_limited) {
-      for (std::size_t j = i + 1; j < n; ++j) {
-        results[j].rate_limited = true;
-        results[j].error = results[i].error;
+  std::string banner = found.ok ? std::string() : found.error;
+  if (!replaced) {
+    results.resize(apps.size());
+    for (std::size_t i = 0; i < apps.size(); ++i) {
+      if (cancel_ || found.rate_limited)
+        break;
+      {
+        std::lock_guard<std::mutex> lock(mu_);
+        progress_text_ = "Checking " + apps[i].display + "…";
+        progress_frac_ =
+            apps.empty() ? 0 : static_cast<double>(i) / static_cast<double>(apps.size());
       }
-      break;
+      progress_dispatch_.emit();
+      results[i] = fetch_latest(apps[i].owner.c_str(), apps[i].repo.c_str(),
+                                apps[i].package.c_str(), &cancel_);
+      if (results[i].rate_limited) {
+        for (std::size_t j = i + 1; j < apps.size(); ++j) {
+          results[j].rate_limited = true;
+          results[j].error = results[i].error;
+        }
+        break;
+      }
+      if (!results[i].ok && !results[i].no_release) {
+        ++failed;
+        if (banner.empty())
+          banner = results[i].error;
+      }
     }
-    if (!results[i].ok && !results[i].no_release) {
-      ++failed;
-      if (banner.empty())
-        banner = results[i].error;
+  } else {
+    for (const Remote& remote : results) {
+      if (!remote.ok && !remote.no_release) {
+        ++failed;
+        if (banner.empty())
+          banner = remote.error;
+      }
     }
   }
+
   {
     std::lock_guard<std::mutex> lock(mu_);
     refresh_result_ = std::move(results);
+    refresh_apps_ = std::move(apps);
+    refresh_slate_ = std::move(slate);
+    refresh_replaced_ = replaced && !cancel_;
     refresh_banner_ = banner;
     progress_frac_ = 1;
+    const std::size_t n = refresh_apps_.size();
     if (cancel_)
       progress_text_ = "Check cancelled.";
-    else if (failed == static_cast<int>(n))
+    else if (found.rate_limited)
+      progress_text_ = "GitHub rate limit.";
+    else if (n > 0 && failed == static_cast<int>(n))
       progress_text_ = banner.empty() ? "Check failed." : ("Check failed: " + banner);
     else if (failed > 0)
       progress_text_ = "Checked with errors.";
@@ -537,6 +597,11 @@ void Window::on_refresh_done()
     refresh_thread_.join();
   set_busy(false);
   progress_.hide();
+  if (cancel_) {
+    status_.set_text("Check cancelled.");
+    update_install_all();
+    return;
+  }
 
   std::vector<Remote> results;
   std::string banner;
@@ -547,20 +612,35 @@ void Window::on_refresh_done()
   }
   status_.set_text(banner);
 
+  bool replaced = false;
+  std::vector<App> apps;
+  std::vector<SlateGuest> slate;
+  {
+    std::lock_guard<std::mutex> lock(mu_);
+    replaced = refresh_replaced_;
+    apps = refresh_apps_;
+    slate = refresh_slate_;
+  }
+  if (replaced) {
+    set_catalog(apps);
+    fill_rows();
+    apps = catalog();
+  }
+
   CatalogCache cache = load_cache();
   cache.checked = now_stamp();
-  std::size_t n = 0;
-  const App* apps = catalog(&n);
+  if (replaced)
+    cache.slate = slate;
   std::vector<std::string> packages;
-  for (std::size_t i = 0; i < n; ++i)
-    packages.emplace_back(apps[i].package);
+  for (const App& app : apps)
+    packages.push_back(app.package);
   const RefreshMerge merged = merge_refresh(cache, packages, results);
   for (std::size_t i = 0; i < rows_.size() && i < merged.rows.size(); ++i) {
     const Remote& rem = merged.rows[i];
     const bool show = rem.ok || rem.no_release || !rem.error.empty();
-    rows_[i]->apply(query_installed(apps[i].package), show ? &rem : nullptr);
+    rows_[i]->apply(query_installed(apps[i].package.c_str()), show ? &rem : nullptr);
   }
-  if (merged.any_live) {
+  if (merged.any_live || replaced) {
     save_cache(cache);
     save_last_check(cache.checked);
     last_checked_.set_text("Last checked: " + cache.checked);
@@ -578,6 +658,8 @@ void Window::on_refresh_done()
     status_.set_text(cache.apps.empty() ? "GitHub rate limit. Try again later."
                                         : "GitHub rate limit. Showing cached versions.");
   }
+  if (replaced)
+    size_to_list();
   update_install_all();
 }
 
